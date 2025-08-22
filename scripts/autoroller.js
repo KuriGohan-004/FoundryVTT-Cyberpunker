@@ -1,25 +1,16 @@
-// Register module setting
+// modules/my-module/main.js
+
 Hooks.once("init", () => {
-  game.settings.register("cyberpunker-red", "autoRollInitiative", {
-    name: "Auto Roll Initiative on Begin Combat",
-    hint: "If enabled, automatically rolls initiative for combatants without initiative when pressing Begin Combat.",
-    scope: "world",
-    config: true,
-    type: Boolean,
-    default: true
-  });
+  console.log("My Auto-Initiative Module | Initializing");
 });
 
-// Hook into when the GM begins combat
-Hooks.on("preUpdateCombat", async (combat, updateData, options, userId) => {
-  // Only act if the setting is enabled
-  if (!game.settings.get("cyberpunker-red", "autoRollInitiative")) return;
+Hooks.on("combatStart", async (combat) => {
+  console.log("My Auto-Initiative Module | Combat started, rolling initiatives");
 
-  // Only trigger when starting combat
-  if (!("started" in updateData) || updateData.started !== true) return;
-
-  // Roll initiative for all combatants without it
-  await combat.rollAll({ reroll: false }); // exactly like the Roll All button
-
-  // No need to manually update turn order, rollAll handles it
+  for (let c of combat.combatants) {
+    if (c.initiative === null) {
+      await c.rollInitiative({ createCombatants: false });
+      console.log(`Rolled initiative for ${c.name}`);
+    }
+  }
 });
