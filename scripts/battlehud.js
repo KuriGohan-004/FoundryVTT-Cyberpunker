@@ -44,6 +44,7 @@ Hooks.on("updateCombat", () => updateCyberpunkerBar(game.combat));
 Hooks.on("deleteCombat", () => removeCyberpunkerBar());
 
 Hooks.on("combatStart", async combat => {
+  // Auto-roll initiative for unrolled combatants
   if (game.settings.get(MODULE_ID, "autoRollInit")) {
     for (let c of combat.combatants) {
       if (c.initiative === null) await c.rollInitiative();
@@ -109,7 +110,7 @@ function updateCyberpunkerBar(combat) {
     visible.push({ combatant: combatants[idx], offset: i });
   }
 
-  // Carousel container
+  // Carousel container (horizontal)
   const carousel = document.createElement("div");
   carousel.style.display = "flex";
   carousel.style.gap = "6px";
@@ -137,6 +138,8 @@ function updateCyberpunkerBar(combat) {
     img.style.objectFit = "cover";
     img.style.transition = "all 0.2s ease-in-out";
     img.style.cursor = "pointer";
+
+    // Click to center and select
     img.addEventListener("click", ev => {
       ev.stopPropagation();
       if (combatant.token?.object?.isOwner) {
@@ -145,8 +148,11 @@ function updateCyberpunkerBar(combat) {
         canvas.animatePan({ x: combatant.token.object.x, y: combatant.token.object.y });
       }
     });
+    // Double click to open sheet
     img.addEventListener("dblclick", ev => combatant.actor?.sheet?.render(true));
+    // Right click to open sheet
     img.addEventListener("contextmenu", ev => { ev.preventDefault(); combatant.actor?.sheet?.render(true); });
+
     carousel.appendChild(img);
   }
 
@@ -168,6 +174,7 @@ function updateCyberpunkerBar(combat) {
   const isGM = game.user.isGM;
   const onlineOwners = active.actor?.players.filter(p => p.active);
 
+  // Add buttons below carousel
   const buttons = document.createElement("div");
   buttons.style.display = "flex";
   buttons.style.gap = "6px";
@@ -199,6 +206,7 @@ function updateCyberpunkerBar(combat) {
     startBtn.addEventListener("click", () => combat.startCombat());
     buttons.appendChild(startBtn);
   }
+
   controls.appendChild(buttons);
 }
 
@@ -246,6 +254,7 @@ function showTurnSpotlight(combatant) {
   setTimeout(() => overlay.remove(), 2500);
 }
 
+// End Turn key binding
 window.addEventListener("keydown", ev => {
   const key = game.settings.get(MODULE_ID, "endTurnKey");
   if (ev.key.toUpperCase() === key.toUpperCase()) {
