@@ -9,6 +9,16 @@ const activeTokenScale = 2;    // Active token size multiplier
 const activeBorderColor = "red"; // Glow color for active token
 const fadeDuration = 0.5;      // seconds
 
+// Helper: get a valid token image
+function getTokenImage(token) {
+    // Pixi texture URL (best for loaded textures)
+    if (token.texture?.baseTexture?.resource?.url) return token.texture.baseTexture.resource.url;
+    // Token data image (fallback)
+    if (token.data.img) return token.data.img;
+    // Actor image (fallback)
+    return token.actor?.img || "";
+}
+
 // Helper function to create carousel container
 function createCarousel() {
     let carousel = document.createElement("div");
@@ -53,7 +63,7 @@ function renderCarousel(combat) {
         tokenEl.style.height = `calc(${carouselHeight} - 10px)`;
         tokenEl.style.marginRight = tokenGap;
         tokenEl.style.flex = "0 0 auto";
-        tokenEl.style.backgroundImage = `url(${token.texture?.src || token.data.img})`;
+        tokenEl.style.backgroundImage = `url(${getTokenImage(token)})`;
         tokenEl.style.backgroundSize = "cover";
         tokenEl.style.backgroundPosition = "center";
         tokenEl.style.borderRadius = "5px";
