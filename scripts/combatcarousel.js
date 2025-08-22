@@ -7,6 +7,7 @@ const visibleCount = 6;        // Current + next 5 tokens
 const tokenGap = "5px";        // Gap between tokens
 const activeTokenScale = 2;    // Active token size multiplier
 const activeBorderColor = "red"; // Glow color for active token
+const fadeDuration = 0.5;      // seconds
 
 // Helper function to create carousel container
 function createCarousel() {
@@ -15,7 +16,7 @@ function createCarousel() {
     carousel.style.position = "fixed";
     carousel.style.top = "0";
     carousel.style.left = "50%";
-    carousel.style.transform = "translateX(-50%)";
+    carousel.style.transform = "translateX(-50%) translateY(0)";
     carousel.style.display = "flex";
     carousel.style.alignItems = "center";
     carousel.style.height = carouselHeight;
@@ -25,6 +26,8 @@ function createCarousel() {
     carousel.style.borderRadius = "5px";
     carousel.style.overflow = "hidden";
     carousel.style.whiteSpace = "nowrap";
+    carousel.style.transition = `opacity ${fadeDuration}s ease, transform ${fadeDuration}s ease`;
+    carousel.style.opacity = "1";
     document.body.appendChild(carousel);
     return carousel;
 }
@@ -50,7 +53,7 @@ function renderCarousel(combat) {
         tokenEl.style.height = `calc(${carouselHeight} - 10px)`;
         tokenEl.style.marginRight = tokenGap;
         tokenEl.style.flex = "0 0 auto";
-        tokenEl.style.backgroundImage = `url(${token.data.img})`;
+        tokenEl.style.backgroundImage = `url(${token.texture?.src || token.data.img})`;
         tokenEl.style.backgroundSize = "cover";
         tokenEl.style.backgroundPosition = "center";
         tokenEl.style.borderRadius = "5px";
@@ -95,8 +98,23 @@ Hooks.on("combatStart", (combat) => {
 });
 
 // Hook to update carousel whenever turn changes
-Hooks.on("updateCombat", (combat, changed, options, userId) => {
+Hooks.on("updateCombat", (combat, changed) => {
     if (changed.turn !== undefined) {
         renderCarousel(combat);
+    }
+});
+
+// Hook to remove carousel when combat ends, with fade + slide animation
+Hooks.on("combatEnd", (combat) => {
+    const carousel = document.getElementById("combat-carousel");
+    if (carousel) {
+        // Animate up and fade
+        carousel.style.opacity = "0";
+        carousel.style.transform = "translateX(-50%) translateY(-100%)";
+
+        // Remove from DOM after transition
+        setTimeout(() => {
+            if (carousel.parentNode) carousel.parentNode.removeChild(carousel);
+        }, fadeDuration * 1000);
     }
 });
