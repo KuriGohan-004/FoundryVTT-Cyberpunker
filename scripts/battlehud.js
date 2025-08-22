@@ -1,263 +1,255 @@
-const MODULE_ID = "cyberpunker-red";
-
 Hooks.once("init", () => {
-  game.settings.register(MODULE_ID, "autoRollInitiative", {
-    name: "Auto-Roll Initiative",
-    hint: "Automatically roll initiative for all tokens without initiative when combat starts.",
+  game.settings.register("cyberpunker-red", "autoRollInit", {
+    name: "Auto Roll Initiative",
+    hint: "Automatically roll initiative for unrolled combatants when combat starts.",
     scope: "world",
     config: true,
-    default: true,
-    type: Boolean
+    type: Boolean,
+    default: true
   });
 
-  game.settings.register(MODULE_ID, "displayCurrentTurn", {
+  game.settings.register("cyberpunker-red", "displayCurrentTurn", {
     name: "Display Current Turn",
-    hint: "Show a large popup of the active combatant when their turn begins.",
+    hint: "Show a spotlight overlay for the current combatant at turn start.",
     scope: "client",
     config: true,
-    default: true,
-    type: Boolean
+    type: Boolean,
+    default: true
   });
 
-  game.settings.register(MODULE_ID, "endTurnKey", {
+  game.settings.register("cyberpunker-red", "endTurnKey", {
     name: "End Turn Key",
-    hint: "Keyboard key to end your turn.",
+    hint: "Key to press to end your turn.",
     scope: "client",
     config: true,
-    default: "E",
-    type: String
+    type: String,
+    default: "E"
   });
 });
 
-Hooks.on("renderCombatTracker", (app, html, data) => {
-  if (document.getElementById("cyberpunker-bar")) return;
+Hooks.once("ready", () => {
+  createCyberpunkerBar();
+  updateCyberpunkerBar(game.combat);
+});
 
+Hooks.on("renderCombatTracker", () => {
+  createCyberpunkerBar();
+  updateCyberpunkerBar(game.combat);
+});
+
+Hooks.on("createCombat", () => updateCyberpunkerBar(game.combat));
+Hooks.on("updateCombat", () => updateCyberpunkerBar(game.combat));
+Hooks.on("deleteCombat", () => removeCyberpunkerBar());
+
+Hooks.on("combatStart", async combat => {
+  if (game.settings.get("cyberpunker-red", "autoRollInit")) {
+    for (let c of combat.combatants) {
+      if (c.initiative === null) await c.rollInitiative();
+    }
+  }
+  updateCyberpunkerBar(combat);
+});
+
+Hooks.on("combatTurn", (combat, updateData, options) => {
+  updateCyberpunkerBar(combat);
+  if (game.settings.get("cyberpunker-red", "displayCurrentTurn")) {
+    showTurnSpotlight(combat.combatant);
+  }
+});
+
+function createCyberpunkerBar() {
+  if (document.getElementById("cyberpunker-bar")) return;
   const bar = document.createElement("div");
   bar.id = "cyberpunker-bar";
-  bar.style.position = "absolute";
-  bar.style.top = "0";
+  bar.style.position = "fixed";
+  bar.style.top = "5px";
   bar.style.left = "50%";
   bar.style.transform = "translateX(-50%)";
+  bar.style.zIndex = 100;
   bar.style.display = "flex";
-  bar.style.flexDirection = "row";
   bar.style.alignItems = "center";
   bar.style.gap = "6px";
-  bar.style.padding = "4px";
-  bar.style.zIndex = 99;
-  bar.style.background = "rgba(0,0,0,0.5)";
-  bar.style.borderRadius = "6px";
+  bar.style.pointerEvents = "none";
 
-  const btnContainer = document.createElement("div");
-  btnContainer.style.width = "100%";
-  btnContainer.style.display = "flex";
-  btnContainer.style.justifyContent = "center";
+  const controls = document.createElement("div");
+  controls.id = "cyberpunker-controls";
+  controls.style.display = "flex";
+  controls.style.flexDirection = "column";
+  controls.style.alignItems = "center";
+  controls.style.gap = "4px";
+  controls.style.pointerEvents = "auto";
 
-  const endTurnBtn = document.createElement("button");
-  endTurnBtn.id = "cyberpunker-endturn";
-  endTurnBtn.textContent = "End Turn";
-  endTurnBtn.style.marginTop = "6px";
-  endTurnBtn.style.display = "none";
-  endTurnBtn.style.background = "black";
-  endTurnBtn.style.color = "red";
-  endTurnBtn.style.border = "1px solid red";
-  endTurnBtn.style.boxShadow = "0 0 8px red";
-  endTurnBtn.style.borderRadius = "4px";
-  endTurnBtn.style.padding = "4px 12px";
-  endTurnBtn.onclick = () => tryEndTurn();
-
-  btnContainer.appendChild(endTurnBtn);
   document.body.appendChild(bar);
-  document.body.appendChild(btnContainer);
-});
-
-function createArrow(direction, combat) {
-  const arrow = document.createElement("div");
-  arrow.textContent = direction === "left" ? "◀" : "▶";
-  arrow.style.color = "white";
-  arrow.style.fontSize = "20px";
-  arrow.style.cursor = "pointer";
-  arrow.style.userSelect = "none";
-  arrow.onclick = () => {
-    let idx = combat.turn ?? 0;
-    if (direction === "left" && idx > 0) combat.update({ turn: idx - 1 });
-    if (direction === "right" && idx < combat.turns.length - 1) combat.update({ turn: idx + 1 });
-  };
-  return arrow;
+  document.body.appendChild(controls);
 }
 
-function updateTokenBar(combat) {
-  const bar = document.getElementById("cyberpunker-bar");
-  if (!bar) return;
-  bar.innerHTML = "";
+function removeCyberpunkerBar() {
+  document.getElementById("cyberpunker-bar")?.remove();
+  document.getElementById("cyberpunker-controls")?.remove();
+}
 
-  if (!combat || !combat.combatants.size) return;
+function updateCyberpunkerBar(combat) {
+  const bar = document.getElementById("cyberpunker-bar");
+  const controls = document.getElementById("cyberpunker-controls");
+  if (!bar || !controls) return;
+  bar.innerHTML = "";
+  controls.innerHTML = "";
+
+  if (!combat) return;
+
+  const combatants = combat.turns;
+  if (!combatants.length) return;
 
   const currentIndex = combat.turn ?? 0;
-  const ordered = combat.turns;
+  const visible = [];
+  for (let i = -4; i <= 4; i++) {
+    let idx = (currentIndex + i + combatants.length) % combatants.length;
+    visible.push({ combatant: combatants[idx], offset: i });
+  }
 
-  const start = Math.max(0, currentIndex - 4);
-  const end = Math.min(ordered.length, currentIndex + 5);
+  if (combatants.length > 9) {
+    const left = document.createElement("div");
+    left.textContent = "◀";
+    left.style.color = "red";
+    left.style.fontSize = "20px";
+    left.style.pointerEvents = "auto";
+    bar.appendChild(left);
+  }
 
-  if (start > 0) bar.appendChild(createArrow("left", combat));
-
-  for (let i = start; i < end; i++) {
-    const combatant = ordered[i];
-    const token = combatant.token;
-    if (!token) continue;
-
+  for (let { combatant, offset } of visible) {
     const img = document.createElement("img");
-    img.src = token.texture.src;
-    img.style.width = i === currentIndex ? "96px" : "48px";
-    img.style.height = i === currentIndex ? "96px" : "48px";
-    img.style.objectFit = "cover";
+    img.src = combatant.token?.texture.src || "icons/svg/mystery-man.svg";
+    img.style.border = "2px solid transparent";
     img.style.borderRadius = "4px";
-    img.style.transition = "all 0.2s ease";
-    img.style.cursor = "pointer";
+    img.style.transition = "all 0.3s ease";
+    img.style.pointerEvents = "auto";
 
-    if (i === currentIndex) {
-      img.style.boxShadow = "0 0 18px 5px red";
+    if (offset === 0) {
+      img.style.border = "2px solid red";
+      img.style.transform = "scale(2.0)";
+    } else {
+      img.style.transform = "scale(1.0)";
     }
 
-    img.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      const tokenDoc = canvas.tokens.get(token.id);
-      if (tokenDoc && tokenDoc.isOwner) {
-        tokenDoc.control({ releaseOthers: true });
-        canvas.animatePan({ x: tokenDoc.x, y: tokenDoc.y, scale: canvas.stage.scale.x });
+    img.addEventListener("click", ev => {
+      ev.stopPropagation();
+      if (combatant.token?.object?.isOwner) {
+        canvas.tokens.controlled.forEach(t => t.release());
+        combatant.token.object.control({ releaseOthers: true });
+        canvas.animatePan({ x: combatant.token.object.x, y: combatant.token.object.y });
       }
     });
-    img.addEventListener("dblclick", (ev) => {
-      ev.preventDefault();
-      if (combatant.actor?.sheet?.rendered) combatant.actor.sheet.bringToTop();
-      else combatant.actor?.sheet?.render(true);
+    img.addEventListener("dblclick", ev => {
+      ev.stopPropagation();
+      combatant.actor?.sheet?.render(true);
     });
-    img.addEventListener("contextmenu", (ev) => {
+    img.addEventListener("contextmenu", ev => {
       ev.preventDefault();
-      if (combatant.actor?.sheet?.rendered) combatant.actor.sheet.bringToTop();
-      else combatant.actor?.sheet?.render(true);
+      combatant.actor?.sheet?.render(true);
     });
 
     bar.appendChild(img);
   }
 
-  if (end < ordered.length) bar.appendChild(createArrow("right", combat));
+  if (combatants.length > 9) {
+    const right = document.createElement("div");
+    right.textContent = "▶";
+    right.style.color = "red";
+    right.style.fontSize = "20px";
+    right.style.pointerEvents = "auto";
+    bar.appendChild(right);
+  }
 
-  updateEndTurnButton(combat);
+  const active = combat.combatant;
+  if (!active) return;
+  const isOwner = active.token?.object?.isOwner;
+  const isGM = game.user.isGM;
+  const onlineOwners = active.actor?.players.filter(p => p.active);
+
+  if (combat.started) {
+    if ((isOwner || (isGM && !onlineOwners?.length))) {
+      const btn = document.createElement("button");
+      btn.textContent = "End Turn";
+      btn.style.background = "black";
+      btn.style.color = "red";
+      btn.style.border = "2px solid red";
+      btn.style.boxShadow = "0 0 8px red";
+      btn.style.borderRadius = "6px";
+      btn.style.padding = "4px 8px";
+      btn.style.cursor = "pointer";
+      btn.addEventListener("click", () => combat.nextTurn());
+      controls.appendChild(btn);
+    }
+  } else if (isGM) {
+    const startBtn = document.createElement("button");
+    startBtn.textContent = "Start Combat";
+    startBtn.style.background = "black";
+    startBtn.style.color = "red";
+    startBtn.style.border = "2px solid red";
+    startBtn.style.boxShadow = "0 0 8px red";
+    startBtn.style.borderRadius = "6px";
+    startBtn.style.padding = "4px 8px";
+    startBtn.style.cursor = "pointer";
+    startBtn.addEventListener("click", () => combat.startCombat());
+    controls.appendChild(startBtn);
+  }
 }
 
 function showTurnSpotlight(combatant) {
-  if (!game.settings.get(MODULE_ID, "displayCurrentTurn")) return;
-  if (!combatant?.token) return;
-
-  const spotlight = document.createElement("div");
-  spotlight.id = "cyberpunker-spotlight";
-  spotlight.style.position = "absolute";
-  spotlight.style.top = 0;
-  spotlight.style.left = 0;
-  spotlight.style.width = "100%";
-  spotlight.style.height = "100%";
-  spotlight.style.background = "rgba(0,0,0,0.7)";
-  spotlight.style.display = "flex";
-  spotlight.style.flexDirection = "column";
-  spotlight.style.alignItems = "center";
-  spotlight.style.justifyContent = "center";
-  spotlight.style.zIndex = 200;
+  if (!combatant) return;
+  const overlay = document.createElement("div");
+  overlay.id = "cyberpunker-spotlight";
+  overlay.style.position = "fixed";
+  overlay.style.top = 0;
+  overlay.style.left = 0;
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
+  overlay.style.display = "flex";
+  overlay.style.flexDirection = "column";
+  overlay.style.alignItems = "center";
+  overlay.style.justifyContent = "center";
+  overlay.style.background = "rgba(0,0,0,0.7)";
+  overlay.style.zIndex = 200;
+  overlay.style.cursor = "pointer";
 
   const img = document.createElement("img");
-  img.src = combatant.token.texture.src;
+  img.src = combatant.token?.texture.src || "icons/svg/mystery-man.svg";
   img.style.width = "256px";
   img.style.height = "256px";
-  img.style.objectFit = "cover";
-  img.style.borderRadius = "8px";
-  img.style.boxShadow = "0 0 20px 5px red";
+  img.style.objectFit = "contain";
+  img.style.marginBottom = "12px";
+  overlay.appendChild(img);
 
-  const nameBanner = document.createElement("div");
-  nameBanner.textContent = combatant.name;
-  nameBanner.style.fontSize = "32px";
-  nameBanner.style.fontWeight = "bold";
-  nameBanner.style.color = "white";
-  nameBanner.style.padding = "8px 16px";
-  nameBanner.style.marginTop = "12px";
-  nameBanner.style.borderRadius = "6px";
-
-  let bannerColor = "red";
-  const owners = combatant.actor?.ownership || {};
-  const playerOwners = game.users.filter(u => owners[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER && u.active);
-  if (playerOwners.length > 0) bannerColor = playerOwners[0].color || bannerColor;
-  nameBanner.style.background = bannerColor;
-
-  spotlight.appendChild(img);
-  spotlight.appendChild(nameBanner);
-
-  spotlight.addEventListener("click", () => spotlight.remove());
-
-  document.body.appendChild(spotlight);
-  setTimeout(() => {
-    if (spotlight.parentNode) spotlight.remove();
-  }, 1500); // halved time
-}
-
-function tryEndTurn() {
-  const combat = game.combat;
-  if (!combat) return;
-  const current = combat.combatant;
-  if (!current) return;
-
-  const token = current.token ? canvas.tokens.get(current.token.id) : null;
-  const isOwner = token?.isOwner;
-  const isGM = game.user.isGM;
-  const actorOwners = current.actor ? game.users.filter(u => current.actor.testUserPermission(u, "OWNER") && u.active) : [];
-
-  if (isOwner || (isGM && actorOwners.length === 0)) {
-    combat.nextTurn();
-  }
-}
-
-function updateEndTurnButton(combat) {
-  const btn = document.getElementById("cyberpunker-endturn");
-  if (!btn) return;
-  const current = combat.combatant;
-  if (!current) { btn.style.display = "none"; return; }
-
-  const token = current.token ? canvas.tokens.get(current.token.id) : null;
-  const isOwner = token?.isOwner;
-  const isGM = game.user.isGM;
-  const actorOwners = current.actor ? game.users.filter(u => current.actor.testUserPermission(u, "OWNER") && u.active) : [];
-
-  if (isOwner || (isGM && actorOwners.length === 0)) {
-    btn.style.display = "block";
+  const name = document.createElement("div");
+  name.textContent = combatant.name;
+  name.style.fontSize = "32px";
+  name.style.padding = "6px 12px";
+  name.style.color = "white";
+  name.style.borderRadius = "6px";
+  const onlineOwners = combatant.actor?.players.filter(p => p.active);
+  if (onlineOwners?.length) {
+    name.style.background = onlineOwners[0].color || "blue";
   } else {
-    btn.style.display = "none";
+    name.style.background = "red";
   }
+  overlay.appendChild(name);
+
+  overlay.addEventListener("click", () => overlay.remove());
+
+  document.body.appendChild(overlay);
+  setTimeout(() => overlay.remove(), 2500);
 }
 
-// Hooks
-Hooks.on("createCombat", (combat) => updateTokenBar(combat));
-Hooks.on("updateCombat", (combat, changed) => updateTokenBar(combat));
-Hooks.on("deleteCombat", () => {
-  const bar = document.getElementById("cyberpunker-bar");
-  if (bar) bar.remove();
-});
-
-Hooks.on("combatStart", async (combat) => {
-  if (!game.settings.get(MODULE_ID, "autoRollInitiative")) return;
-  const unrolled = combat.combatants.filter(c => c.initiative === null);
-  if (!unrolled.length) return;
-  await combat.rollInitiative(unrolled.map(c => c.id));
-});
-
-Hooks.on("combatTurn", (combat, updateData) => {
-  const nextTurn = combat.turn;
-  if (nextTurn != null && combat.turns[nextTurn]) {
-    const current = combat.turns[nextTurn];
-    if (current) showTurnSpotlight(current);
-  }
-  updateTokenBar(combat);
-});
-
-window.addEventListener("keydown", (ev) => {
-  const key = game.settings.get(MODULE_ID, "endTurnKey")?.toUpperCase() || "E";
-  if (ev.key.toUpperCase() === key) {
-    tryEndTurn();
+window.addEventListener("keydown", ev => {
+  const key = game.settings.get("cyberpunker-red", "endTurnKey");
+  if (ev.key.toUpperCase() === key.toUpperCase()) {
+    const combat = game.combat;
+    if (!combat) return;
+    const active = combat.combatant;
+    if (!active) return;
+    const isOwner = active.token?.object?.isOwner;
+    const isGM = game.user.isGM;
+    const onlineOwners = active.actor?.players.filter(p => p.active);
+    if (isOwner || (isGM && !onlineOwners?.length)) combat.nextTurn();
   }
 });
