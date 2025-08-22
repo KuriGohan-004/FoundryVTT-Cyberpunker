@@ -15,11 +15,13 @@
   ],
   "scripts": [
   "scripts/combathud.js",
+  "scripts/autoroller.js",
   "scripts/battlehud.js"],
   "url": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker",
   "manifest": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker/blob/main/module.json",
   "download": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker/archive/refs/heads/main.zip",
   "license": ""
 }
+
 
 
