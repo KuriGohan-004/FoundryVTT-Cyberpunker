@@ -1,6 +1,6 @@
 class CyberpunkerTokenBar {
   static init() {
-    // Create a container
+    // Create container
     const bar = document.createElement("div");
     bar.id = "cyberpunker-token-bar";
     bar.style.position = "absolute";
@@ -8,7 +8,7 @@ class CyberpunkerTokenBar {
     bar.style.left = "50%";
     bar.style.transform = "translateX(-50%)";
     bar.style.display = "flex";
-    bar.style.gap = "6px";
+    bar.style.gap = "8px"; // small gap
     bar.style.zIndex = 100;
     bar.style.padding = "4px";
     bar.style.pointerEvents = "auto";
@@ -41,24 +41,28 @@ class CyberpunkerTokenBar {
     // Clear bar
     bar.innerHTML = "";
 
-    // Collect player-owned tokens in current scene
+    // Get tokens in current scene
     const scene = game.scenes?.current;
     if (!scene) return;
 
     const tokens = scene.tokens.filter(t => {
       const actor = t.actor;
       if (!actor) return false;
-      return actor.ownership[game.user.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER;
+      // If ANY player has at least OWNER level, include it
+      return game.users.some(u =>
+        (u.role >= CONST.USER_ROLES.PLAYER) && // player or trusted
+        (actor.ownership[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER)
+      );
     });
 
     // Render tokens
     for (const token of tokens) {
       const img = document.createElement("img");
       img.src = token.texture.src;
-      img.style.width = "48px";
-      img.style.height = "48px";
-      img.style.borderRadius = "50%";
-      img.style.border = "2px solid #ff0044"; // Cyberpunk-y color
+      img.style.maxWidth = "64px";
+      img.style.maxHeight = "64px";
+      img.style.objectFit = "contain";
+      img.style.border = "1px solid #ff0044"; // cyberpunk accent
       img.style.cursor = "pointer";
 
       // Left-click: focus camera
