@@ -1,3 +1,5 @@
+// File: cyberpunker-red.js
+
 class CyberpunkerTokenBar {
   static init() {
     // Create container
@@ -80,7 +82,7 @@ class CyberpunkerTokenBar {
       img.style.maxWidth = "64px";
       img.style.maxHeight = "64px";
       img.style.objectFit = "contain";
-      img.style.border = "1px solid #ff0044"; // cyberpunk accent
+      img.style.border = "1px solid #ff0044";
       img.style.cursor = "pointer";
 
       // Left-click: focus camera + select if allowed
@@ -95,7 +97,13 @@ class CyberpunkerTokenBar {
         }
       });
 
-      // Right-click: open sheet
+      // Double-click: open sheet
+      img.addEventListener("dblclick", ev => {
+        ev.preventDefault();
+        token.actor?.sheet?.render(true);
+      });
+
+      // Right-click (still works): open sheet
       img.addEventListener("contextmenu", ev => {
         ev.preventDefault();
         token.actor?.sheet?.render(true);
@@ -105,7 +113,6 @@ class CyberpunkerTokenBar {
     }
   }
 
-  // Toggle Sheet Controls
   static toggleSelectedSheet() {
     const selected = canvas.tokens.controlled;
     if (!selected.length) return;
@@ -125,9 +132,18 @@ class CyberpunkerTokenBar {
   }
 }
 
-
-
-// Initialize when ready - End Of Script
+// Initialize when ready
 Hooks.once("ready", () => {
   CyberpunkerTokenBar.init();
+
+  // Remove the default "Cycle Canvas View" binding (usually Tab)
+  try {
+    const cycleAction = game.keybindings.actions["core.cycleCanvasViews"];
+    if (cycleAction) {
+      game.keybindings.set("core", "cycleCanvasViews", []); // clear keybinding
+      console.log("Cyberpunker Red: Removed default Cycle Canvas View keybinding.");
+    }
+  } catch (err) {
+    console.warn("Cyberpunker Red: Could not remove cycleCanvasViews binding", err);
+  }
 });
