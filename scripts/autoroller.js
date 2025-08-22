@@ -1,8 +1,8 @@
 // Register the module setting
 Hooks.once("init", () => {
   game.settings.register("cyberpunker-red", "autoRollInitiative", {
-    name: "Auto-Roll Initiative",
-    hint: "If enabled, combatants without initiative will automatically roll when combat starts.",
+    name: "Auto-Roll Initiative on Begin Combat",
+    hint: "If enabled, combatants without initiative will automatically roll when the GM presses Begin Combat.",
     scope: "world",
     config: true,
     type: Boolean,
@@ -10,26 +10,27 @@ Hooks.once("init", () => {
   });
 });
 
-// Hook into combat creation
-Hooks.on("preCreateCombat", async (combat, options, userId) => {
+// Hook into combat start
+Hooks.on("preUpdateCombat", async (combat, updateData, options, userId) => {
   // Check if the setting is enabled
   if (!game.settings.get("cyberpunker-red", "autoRollInitiative")) return;
 
-  // Slight delay to ensure combatants are created
-  setTimeout(async () => {
-    const combatantsToRoll = combat.combatants.filter(c => c.initiative === null);
+  // Only act when Begin Combat is pressed
+  if (updateData.started !== true) return;
 
-    for (const combatant of combatantsToRoll) {
-      const actor = combatant.actor;
-      if (!actor) continue;
+  // Filter combatants without initiative
+  const combatantsToRoll = combat.combatants.filter(c => c.initiative === null);
 
-      // Roll initiative: use actor's initiative formula if available, fallback to d20
-      const formula = actor.data.data?.attributes?.initiative?.formula || "1d20";
-      const roll = await new Roll(formula).roll({ async: true });
-      await combat.setCombatantInitiative(combatant.id, roll.total);
-    }
+  for (const combatant of combatantsToRoll) {
+    const actor = combatant.actor;
+    if (!actor) continue;
 
-    // Refresh the turn order
-    await combat.update({ turn: 0 });
-  }, 100);
+    // Use actor initiative formula if available, fallback to 1d20
+    const formula = actor.data.data?.attributes?.initiative?.formula || "1d20";
+    const roll = await new Roll(formula).roll({ async: true });
+    await combat.setCombatantInitiative(combatant.id, roll.total);
+  }
+
+  // Refresh turn order
+  await combat.update({ turn: 0 });
 });
