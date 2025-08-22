@@ -39,24 +39,35 @@ Hooks.on("renderCombatTracker", (app, html, data) => {
   bar.style.left = "50%";
   bar.style.transform = "translateX(-50%)";
   bar.style.display = "flex";
+  bar.style.flexDirection = "row";
   bar.style.alignItems = "center";
   bar.style.gap = "6px";
   bar.style.padding = "4px";
   bar.style.zIndex = 99;
   bar.style.background = "rgba(0,0,0,0.5)";
   bar.style.borderRadius = "6px";
-  bar.style.flexDirection = "column";
 
-  // End Turn button container
+  const btnContainer = document.createElement("div");
+  btnContainer.style.width = "100%";
+  btnContainer.style.display = "flex";
+  btnContainer.style.justifyContent = "center";
+
   const endTurnBtn = document.createElement("button");
   endTurnBtn.id = "cyberpunker-endturn";
   endTurnBtn.textContent = "End Turn";
-  endTurnBtn.style.marginTop = "4px";
+  endTurnBtn.style.marginTop = "6px";
   endTurnBtn.style.display = "none";
+  endTurnBtn.style.background = "black";
+  endTurnBtn.style.color = "red";
+  endTurnBtn.style.border = "1px solid red";
+  endTurnBtn.style.boxShadow = "0 0 8px red";
+  endTurnBtn.style.borderRadius = "4px";
+  endTurnBtn.style.padding = "4px 12px";
   endTurnBtn.onclick = () => tryEndTurn();
 
-  bar.appendChild(endTurnBtn);
+  btnContainer.appendChild(endTurnBtn);
   document.body.appendChild(bar);
+  document.body.appendChild(btnContainer);
 });
 
 function createArrow(direction, combat) {
@@ -77,10 +88,7 @@ function createArrow(direction, combat) {
 function updateTokenBar(combat) {
   const bar = document.getElementById("cyberpunker-bar");
   if (!bar) return;
-  // keep End Turn button
-  const endTurnBtn = document.getElementById("cyberpunker-endturn");
   bar.innerHTML = "";
-  if (endTurnBtn) bar.appendChild(endTurnBtn);
 
   if (!combat || !combat.combatants.size) return;
 
@@ -108,7 +116,6 @@ function updateTokenBar(combat) {
 
     if (i === currentIndex) {
       img.style.boxShadow = "0 0 18px 5px red";
-      img.style.transform = "scale(1.0)"; // size already doubled
     }
 
     img.addEventListener("click", async (ev) => {
@@ -135,7 +142,6 @@ function updateTokenBar(combat) {
 
   if (end < ordered.length) bar.appendChild(createArrow("right", combat));
 
-  // Update End Turn button visibility
   updateEndTurnButton(combat);
 }
 
@@ -182,11 +188,13 @@ function showTurnSpotlight(combatant) {
 
   spotlight.appendChild(img);
   spotlight.appendChild(nameBanner);
-  document.body.appendChild(spotlight);
 
+  spotlight.addEventListener("click", () => spotlight.remove());
+
+  document.body.appendChild(spotlight);
   setTimeout(() => {
-    spotlight.remove();
-  }, 3000);
+    if (spotlight.parentNode) spotlight.remove();
+  }, 1500); // halved time
 }
 
 function tryEndTurn() {
@@ -225,9 +233,7 @@ function updateEndTurnButton(combat) {
 
 // Hooks
 Hooks.on("createCombat", (combat) => updateTokenBar(combat));
-Hooks.on("updateCombat", (combat, changed) => {
-  updateTokenBar(combat);
-});
+Hooks.on("updateCombat", (combat, changed) => updateTokenBar(combat));
 Hooks.on("deleteCombat", () => {
   const bar = document.getElementById("cyberpunker-bar");
   if (bar) bar.remove();
@@ -241,12 +247,14 @@ Hooks.on("combatStart", async (combat) => {
 });
 
 Hooks.on("combatTurn", (combat, updateData) => {
-  const current = combat.combatant;
-  if (current) showTurnSpotlight(current);
+  const nextTurn = combat.turn;
+  if (nextTurn != null && combat.turns[nextTurn]) {
+    const current = combat.turns[nextTurn];
+    if (current) showTurnSpotlight(current);
+  }
   updateTokenBar(combat);
 });
 
-// End turn hotkey
 window.addEventListener("keydown", (ev) => {
   const key = game.settings.get(MODULE_ID, "endTurnKey")?.toUpperCase() || "E";
   if (ev.key.toUpperCase() === key) {
