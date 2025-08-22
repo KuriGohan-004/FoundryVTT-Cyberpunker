@@ -8,11 +8,29 @@ class CyberpunkerTokenBar {
     bar.style.left = "50%";
     bar.style.transform = "translateX(-50%)";
     bar.style.display = "flex";
-    bar.style.gap = "8px"; // small gap
+    bar.style.gap = "8px";
     bar.style.zIndex = 100;
     bar.style.padding = "4px";
     bar.style.pointerEvents = "auto";
     document.body.appendChild(bar);
+
+    // Register settings
+    game.settings.register("cyberpunker-red", "sheetHotkey", {
+      name: "Sheet Toggle Hotkey",
+      hint: "Press this key to toggle the sheet of your currently selected token.",
+      scope: "client",
+      config: true,
+      type: String,
+      default: "Tab"
+    });
+
+    // Hotkey listener
+    window.addEventListener("keydown", ev => {
+      const settingKey = game.settings.get("cyberpunker-red", "sheetHotkey").toLowerCase();
+      if (ev.key.toLowerCase() === settingKey) {
+        CyberpunkerTokenBar.toggleSelectedSheet();
+      }
+    });
 
     // Re-render on relevant hooks
     Hooks.on("updateScene", () => CyberpunkerTokenBar.render());
@@ -50,7 +68,7 @@ class CyberpunkerTokenBar {
       if (!actor) return false;
       // If ANY player has at least OWNER level, include it
       return game.users.some(u =>
-        (u.role >= CONST.USER_ROLES.PLAYER) && // player or trusted
+        (u.role >= CONST.USER_ROLES.PLAYER) &&
         (actor.ownership[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER)
       );
     });
@@ -65,10 +83,16 @@ class CyberpunkerTokenBar {
       img.style.border = "1px solid #ff0044"; // cyberpunk accent
       img.style.cursor = "pointer";
 
-      // Left-click: focus camera
+      // Left-click: focus camera + select if allowed
       img.addEventListener("click", ev => {
         ev.preventDefault();
         canvas.animatePan({ x: token.x, y: token.y, scale: 1.5 });
+
+        const isGM = game.user.isGM || game.user.role >= CONST.USER_ROLES.ASSISTANT;
+        const canControl = isGM || token.actor?.ownership[game.user.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER;
+        if (canControl) {
+          token.object?.control({ releaseOthers: true });
+        }
       });
 
       // Right-click: open sheet
@@ -80,9 +104,30 @@ class CyberpunkerTokenBar {
       bar.appendChild(img);
     }
   }
+
+  // Toggle Sheet Controls
+  static toggleSelectedSheet() {
+    const selected = canvas.tokens.controlled;
+    if (!selected.length) return;
+
+    // Find first selected token you can at least observe
+    const token = selected.find(t =>
+      game.user.isGM ||
+      t.actor?.ownership[game.user.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
+    );
+    if (!token) return;
+
+    const sheet = token.actor?.sheet;
+    if (!sheet) return;
+
+    if (sheet.rendered) sheet.close();
+    else sheet.render(true);
+  }
 }
 
-// Initialize when ready
+
+
+// Initialize when ready - End Of Script
 Hooks.once("ready", () => {
   CyberpunkerTokenBar.init();
 });
