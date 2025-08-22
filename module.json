@@ -1,0 +1,23 @@
+{
+  "id": "cyberpunker-red",
+  "title": "Cyberpunker Red",
+  "description": "A variety of fixes and tweaks designed for Cyberpunk Red on Foundry V11.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "11"
+  },
+  "authors": [
+    {
+      "name": "Kuri_Kame",
+      "flags": {}
+    }
+  ],
+  "scripts": [
+  "scripts/combathud.js"],
+  "url": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker",
+  "manifest": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker/blob/main/module.json",
+  "download": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker/archive/refs/heads/main.zip",
+  "license": ""
+}
+
