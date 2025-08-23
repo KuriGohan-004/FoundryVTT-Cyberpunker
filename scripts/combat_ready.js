@@ -30,9 +30,9 @@ class CyberpunkerCombatControls {
       textShadow: "0 0 6px red",
       fontFamily: "monospace",
       cursor: "pointer",
-      width: "80px",
-      height: "20px",          // FIXED HEIGHT
-      maxHeight: "3vh",        // also constrain as % of viewport
+      width: "calc(100% - 8px)", // full width minus sidebar padding
+      height: "20px",             // fixed height
+      maxHeight: "3vh",
       padding: "2px",
       margin: "4px",
       textAlign: "center",
@@ -101,10 +101,21 @@ class CyberpunkerCombatControls {
         "Combatant",
         tokens.map(t => ({ tokenId: t.id }))
       );
+
+      // Roll initiative for any combatant that hasn't rolled yet
+      for (let c of newCombat.combatants) {
+        if (c.initiative === null) await c.rollInitiative({ chatMessage: false });
+      }
+
+      // Sort combatants by initiative descending
+      newCombat.turns.sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0));
+
+      // Set turn to the top combatant
+      await newCombat.update({ turn: 0 });
+
       await newCombat.startCombat();
     }
 
-    // Always update button and bar
     this.updateButtonState();
   }
 
