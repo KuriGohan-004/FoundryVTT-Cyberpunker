@@ -1,7 +1,7 @@
 // File: cyberpunker-combat.js
 
 class CyberpunkerCombatControls {
-  static BUTTON_ID = "cyberpunker-combat-toggle";
+  static BUTTON_ID = "cyberpunker-ready-combat";
 
   static init() {
     if (!game.user.isGM) return;
@@ -17,7 +17,7 @@ class CyberpunkerCombatControls {
 
     const btn = document.createElement("button");
     btn.id = this.BUTTON_ID;
-    btn.innerText = "Select All Tokens";
+    btn.innerText = "Ready Combat";
 
     Object.assign(btn.style, {
       background: "black",
@@ -37,31 +37,45 @@ class CyberpunkerCombatControls {
       overflow: "hidden"
     });
 
-    btn.addEventListener("click", () => this.selectAllTokens());
+    btn.addEventListener("click", () => this.readyCombat());
 
     const sidebar = document.getElementById("sidebar");
     if (sidebar) sidebar.appendChild(btn);
   }
 
-  static selectAllTokens() {
-    const allTokens = canvas.tokens.placeables;
-    if (!allTokens.length) return;
+  static async readyCombat() {
+    const tokens = canvas.tokens.placeables;
+    if (!tokens.length) return;
 
-    // Deselect everything first
+    // Deselect all first
     canvas.tokens.releaseAll();
 
-    // Select all tokens on the map
-    for (const token of allTokens) {
+    // Select all tokens
+    for (const token of tokens) {
       token.control({ releaseOthers: false });
     }
 
-    // Open the Combat/Encounter sidebar
-    const combatSidebar = document.querySelector("#sidebar .directory[data-tab='combat']");
-    if (combatSidebar) combatSidebar.click();
+    // Switch to Combat/Encounters tab
+    const combatTab = document.querySelector("#sidebar .directory[data-tab='combat']");
+    if (combatTab) combatTab.click();
+
+    // Create new combat encounter
+    const newCombat = await Combat.create({ scene: canvas.scene.id });
+
+    // Add all selected tokens as combatants
+    const selectedTokens = canvas.tokens.controlled;
+    if (!selectedTokens.length) return;
+
+    await newCombat.createEmbeddedDocuments(
+      "Combatant",
+      selectedTokens.map(t => ({ tokenId: t.id }))
+    );
+
+    ui.notifications.info("Ready Combat: All tokens added to new encounter.");
   }
 
   static onCombatStart() {
-    // Hide non-combat portrait bar if it exists
+    // Hide non-combat portrait bar
     const bar = document.getElementById("cyberpunker-token-bar");
     if (bar) bar.style.display = "none";
 
