@@ -1,127 +1,125 @@
-class CyberpunkerCombatManager {
-  static ID = "cyberpunker-combat-manager";
-  static FADE_ID = "cyberpunker-red-fade";
-  static BUTTON_ID = "cyberpunker-combat-btn";
+// File: cyberpunker-combat_ready.js
+
+class CyberpunkerCombatControls {
+  static ID = "cyberpunker-red";
 
   static init() {
+    this.createGMButton();
+
     // Hooks
-    Hooks.on("combatStart", this.onCombatStart.bind(this));
-    Hooks.on("combatEnd", this.onCombatEnd.bind(this));
-    Hooks.on("renderSidebarTab", this.onRenderSidebarTab.bind(this));
+    Hooks.on("combatStart", () => this.onCombatStart());
+    Hooks.on("deleteCombat", () => this.onCombatEnd());
+    Hooks.on("updateCombat", () => this.onCombatUpdate());
   }
 
-  // When combat begins
-  static onCombatStart(combat) {
-    this.addRedFade();
-    this.updateButton(true);
-  }
-
-  // When combat ends
-  static onCombatEnd(combat) {
-    this.removeRedFade();
-    this.updateButton(false);
-  }
-
-  // Add the GM button at bottom of left sidebar
-  static onRenderSidebarTab(app, html) {
-    if (!game.user.isGM) return;
-
-    // Avoid duplicates
-    if (document.getElementById(this.BUTTON_ID)) return;
-
-    const btn = document.createElement("button");
-    btn.id = this.BUTTON_ID;
-    btn.innerText = "⚔️ Start Combat";
-    Object.assign(btn.style, {
-      background: "black",
-      color: "red",
-      border: "2px solid red",
-      borderRadius: "6px",
-      fontWeight: "bold",
-      textShadow: "0 0 5px red",
-      margin: "4px 6px",
-      padding: "6px 10px",
-      cursor: "pointer",
-      width: "calc(100% - 12px)"
-    });
+  // --- GM Button ---
+  static createGMButton() {
+    const btn = document.createElement("div");
+    btn.id = "cyberpunker-combat-toggle";
+    btn.innerText = "⚔️ Combat";
+    btn.style.position = "absolute";
+    btn.style.left = "5px";
+    btn.style.bottom = "5px";
+    btn.style.width = "80px";
+    btn.style.height = "28px"; // shorter button
+    btn.style.lineHeight = "28px";
+    btn.style.textAlign = "center";
+    btn.style.background = "black";
+    btn.style.border = "1px solid red";
+    btn.style.color = "red";
+    btn.style.fontFamily = "monospace";
+    btn.style.cursor = "pointer";
+    btn.style.zIndex = 200;
+    btn.style.textShadow = "0 0 6px red";
+    btn.style.borderRadius = "6px";
 
     btn.addEventListener("click", () => this.toggleCombat());
 
-    // Append to bottom of left sidebar
-    const sidebar = document.getElementById("sidebar");
-    if (sidebar) {
-      sidebar.appendChild(btn);
-    }
-
-    // Sync initial state
-    this.updateButton(!!game.combat);
+    document.body.appendChild(btn);
   }
 
-  // Adds a red fade at top 5% of screen
-  static addRedFade() {
-    if (document.getElementById(this.FADE_ID)) return;
-
-    const fade = document.createElement("div");
-    fade.id = this.FADE_ID;
-    Object.assign(fade.style, {
-      position: "fixed",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: "5%",
-      background: "linear-gradient(to bottom, rgba(255,0,0,0.6), rgba(0,0,0,0))",
-      pointerEvents: "none",
-      zIndex: 50 // beneath carousel (which uses 100)
-    });
-
-    document.body.appendChild(fade);
-  }
-
-  // Removes red fade
-  static removeRedFade() {
-    const fade = document.getElementById(this.FADE_ID);
-    if (fade) fade.remove();
-  }
-
-  // Toggle combat state
   static async toggleCombat() {
-    const combat = game.combat;
+    const combat = game.combats.active;
 
     if (combat) {
       // End combat
-      await combat.endCombat();
-      return;
-    }
-
-    // No combat exists → add selected tokens & start new combat
-    const tokens = canvas.tokens.controlled;
-    if (!tokens.length) {
-      ui.notifications.warn("Select at least one token to start combat.");
-      return;
-    }
-
-    let cbt = game.combats.active;
-    if (!cbt) {
-      cbt = await Combat.create({ scene: canvas.scene.id });
-    }
-
-    for (let token of tokens) {
-      if (!cbt.combatants.find(c => c.tokenId === token.id)) {
-        await cbt.createEmbeddedDocuments("Combatant", [{ tokenId: token.id }]);
+      await combat.delete();
+    } else {
+      // Collect selected tokens and add them to combat
+      const tokens = canvas.tokens.controlled;
+      if (!tokens.length) {
+        ui.notifications.warn("Select tokens to start combat.");
+        return;
       }
-    }
 
-    await cbt.startCombat();
+      const combatDoc = await Combat.create({ scene: canvas.scene.id });
+      await combatDoc.createEmbeddedDocuments(
+        "Combatant",
+        tokens.map(t => ({ tokenId: t.id }))
+      );
+      await combatDoc.startCombat();
+    }
   }
 
-  // Update button label depending on state
-  static updateButton(isInCombat) {
-    const btn = document.getElementById(this.BUTTON_ID);
-    if (!btn) return;
-    btn.innerText = isInCombat ? "✖️ End Combat" : "⚔️ Start Combat";
+  // --- Red Fade ---
+  static addRedFade() {
+    if (document.getElementById("cyberpunker-red-fade")) return;
+
+    const fade = document.createElement("div");
+    fade.id = "cyberpunker-red-fade";
+    fade.style.position = "absolute";
+    fade.style.top = "0";
+    fade.style.left = "0";
+    fade.style.width = "100%";
+    fade.style.height = "5%";
+    fade.style.background = "linear-gradient(to bottom, rgba(255,0,0,0.6), rgba(255,0,0,0))";
+    fade.style.zIndex = 99; // just beneath carousel bar
+    fade.style.pointerEvents = "none";
+    document.body.appendChild(fade);
+  }
+
+  static removeRedFade() {
+    const fade = document.getElementById("cyberpunker-red-fade");
+    if (fade) fade.remove();
+  }
+
+  // --- Hooks ---
+  static onCombatStart() {
+    // Only add fade if there are player-owned tokens
+    const combat = game.combats.active;
+    if (!combat) return;
+
+    const hasPlayerOwned = combat.combatants.some(c => {
+      const actor = c.actor;
+      return actor && game.users.some(u =>
+        u.role >= CONST.USER_ROLES.PLAYER &&
+        actor.ownership[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
+      );
+    });
+
+    if (hasPlayerOwned) this.addRedFade();
+
+    // Hide the non-combat bar
+    const bar = document.getElementById("cyberpunker-token-bar");
+    if (bar) bar.style.display = "none";
+  }
+
+  static onCombatEnd() {
+    this.removeRedFade();
+
+    // Restore non-combat bar
+    const bar = document.getElementById("cyberpunker-token-bar");
+    if (bar) bar.style.display = "flex";
+  }
+
+  static onCombatUpdate(combat, changes, options, userId) {
+    if (combat.round === 0 && combat.turn === 0) {
+      this.onCombatStart();
+    }
   }
 }
 
-Hooks.once("init", () => {
-  CyberpunkerCombatManager.init();
+// Init
+Hooks.once("ready", () => {
+  if (game.user.isGM) CyberpunkerCombatControls.init();
 });
