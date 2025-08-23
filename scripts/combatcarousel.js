@@ -1,130 +1,99 @@
-// == Combat Carousel Script ==
-// Adds a horizontal turn order carousel at the top of the screen
+class CyberpunkerRedCarousel {
+  static ID = "cyberpunker-red";
+  static carousel = null;
 
-// Configuration
-const carouselHeight = "10vh"; // 10% of screen height
-const visibleCount = 6;        // Current + next 5 tokens
-const tokenGap = "5px";        // Gap between tokens
-const activeTokenScale = 2;    // Active token size multiplier
-const activeBorderColor = "red"; // Glow color for active token
-const fadeDuration = 0.5;      // seconds
+  static init() {
+    Hooks.on("ready", () => {
+      // Ensure carousel shows for late joiners if combat is active
+      if (game.combat) this.renderCarousel();
+    });
 
-// Helper: get a valid token image
-function getTokenImage(token) {
-    // Pixi texture URL (best for loaded textures)
-    if (token.texture?.baseTexture?.resource?.url) return token.texture.baseTexture.resource.url;
-    // Token data image (fallback)
-    if (token.data.img) return token.data.img;
-    // Actor image (fallback)
-    return token.actor?.img || "";
-}
+    Hooks.on("deleteCombat", () => this.removeCarousel());
+    Hooks.on("combatStart", () => this.renderCarousel());
+    Hooks.on("combatEnd", () => this.removeCarousel());
 
-// Helper function to create carousel container
-function createCarousel() {
-    let carousel = document.createElement("div");
-    carousel.id = "combat-carousel";
-    carousel.style.position = "fixed";
-    carousel.style.top = "0";
-    carousel.style.left = "50%";
-    carousel.style.transform = "translateX(-50%) translateY(0)";
-    carousel.style.display = "flex";
-    carousel.style.alignItems = "center";
-    carousel.style.height = carouselHeight;
-    carousel.style.zIndex = "9999";
-    carousel.style.background = "rgba(0,0,0,0.4)";
-    carousel.style.padding = "5px";
-    carousel.style.borderRadius = "5px";
-    carousel.style.overflow = "hidden";
-    carousel.style.whiteSpace = "nowrap";
-    carousel.style.transition = `opacity ${fadeDuration}s ease, transform ${fadeDuration}s ease`;
-    carousel.style.opacity = "1";
-    document.body.appendChild(carousel);
-    return carousel;
-}
+    // Keep carousel updated each turn
+    Hooks.on("updateCombat", () => this.renderCarousel());
+    Hooks.on("updateCombatant", () => this.renderCarousel());
+  }
 
-// Function to render carousel given a combat
-function renderCarousel(combat) {
+  static renderCarousel() {
+    this.removeCarousel();
+
+    const combat = game.combat;
     if (!combat) return;
-    let carousel = document.getElementById("combat-carousel") || createCarousel();
-    carousel.innerHTML = "";
 
-    let turnOrder = combat.turns;
-    if (!turnOrder.length) return;
+    const turn = combat.turn;
+    const combatants = combat.turns;
+    if (!combatants.length) return;
 
-    const currentIndex = combat.turn;
-    for (let i = 0; i < visibleCount; i++) {
-        const index = (currentIndex + i) % turnOrder.length;
-        const combatant = turnOrder[index];
-        const token = canvas.tokens.get(combatant.tokenId);
-        if (!token) continue;
+    // Create container
+    const container = document.createElement("div");
+    container.id = `${this.ID}-carousel`;
+    Object.assign(container.style, {
+      position: "absolute",
+      top: "10px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      display: "flex",
+      gap: "10px",
+      alignItems: "center",
+      zIndex: 100,
+      pointerEvents: "auto"
+    });
 
-        const tokenEl = document.createElement("div");
-        tokenEl.style.width = `calc(${carouselHeight} - 10px)`;
-        tokenEl.style.height = `calc(${carouselHeight} - 10px)`;
-        tokenEl.style.marginRight = tokenGap;
-        tokenEl.style.flex = "0 0 auto";
-        tokenEl.style.backgroundImage = `url(${getTokenImage(token)})`;
-        tokenEl.style.backgroundSize = "cover";
-        tokenEl.style.backgroundPosition = "center";
-        tokenEl.style.borderRadius = "5px";
-        tokenEl.style.cursor = "pointer";
-        tokenEl.style.transition = "transform 0.2s, box-shadow 0.2s";
-
-        // Highlight current active token
-        if (i === 0) {
-            tokenEl.style.transform = `scale(${activeTokenScale})`;
-            tokenEl.style.boxShadow = `0 0 15px 5px ${activeBorderColor}`;
-        }
-
-        // Click handlers
-        tokenEl.addEventListener("click", () => {
-            canvas.tokens.get(combatant.tokenId)?.control({ releaseOthers: true });
-            canvas.animatePan({ x: token.x + token.width / 2, y: token.y + token.height / 2, scale: canvas.stage.scale.x });
-        });
-        tokenEl.addEventListener("dblclick", () => {
-            combatant.actor?.sheet?.render(true);
-        });
-
-        carousel.appendChild(tokenEl);
+    // Grab ordered list: current + next 4
+    const ordered = [];
+    for (let i = 0; i < 5; i++) {
+      const idx = (turn + i) % combatants.length;
+      ordered.push(combatants[idx]);
     }
 
-    // Add continuation arrow if needed
-    if (turnOrder.length > visibleCount) {
-        const arrow = document.createElement("div");
-        arrow.innerText = "→";
-        arrow.style.fontSize = "2em";
-        arrow.style.color = "white";
-        arrow.style.display = "flex";
-        arrow.style.alignItems = "center";
-        arrow.style.justifyContent = "center";
-        arrow.style.marginLeft = tokenGap;
-        carousel.appendChild(arrow);
+    // Build portraits
+    ordered.forEach((combatant, i) => {
+      const token = combatant.token?.object;
+      if (!combatant.token) return;
+
+      const portrait = document.createElement("img");
+      portrait.src = combatant.token.texture.src;
+      portrait.draggable = false;
+      portrait.dataset.combatantId = combatant.id;
+
+      Object.assign(portrait.style, {
+        borderRadius: "50%",
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        width: i === 0 ? "100px" : "50px",
+        height: i === 0 ? "100px" : "50px",
+        border: i === 0 ? "3px solid red" : "2px solid #444",
+        boxShadow: i === 0 ? "0 0 20px red" : "none",
+        objectFit: "cover"
+      });
+
+      // Click to pan camera
+      portrait.addEventListener("click", () => {
+        const t = canvas.tokens.get(combatant.token.id);
+        if (t) canvas.animatePan({ x: t.x, y: t.y, scale: 1.5 });
+      });
+
+      // Double-click to open sheet
+      portrait.addEventListener("dblclick", () => {
+        if (combatant.actor?.sheet) combatant.actor.sheet.render(true);
+      });
+
+      container.appendChild(portrait);
+    });
+
+    document.body.appendChild(container);
+    this.carousel = container;
+  }
+
+  static removeCarousel() {
+    if (this.carousel) {
+      this.carousel.remove();
+      this.carousel = null;
     }
+  }
 }
 
-// Hook to create carousel at combat start
-Hooks.on("combatStart", (combat) => {
-    renderCarousel(combat);
-});
-
-// Hook to update carousel whenever turn changes
-Hooks.on("updateCombat", (combat, changed) => {
-    if (changed.turn !== undefined) {
-        renderCarousel(combat);
-    }
-});
-
-// Hook to remove carousel when combat ends, with fade + slide animation
-Hooks.on("combatEnd", (combat) => {
-    const carousel = document.getElementById("combat-carousel");
-    if (carousel) {
-        // Animate up and fade
-        carousel.style.opacity = "0";
-        carousel.style.transform = "translateX(-50%) translateY(-100%)";
-
-        // Remove from DOM after transition
-        setTimeout(() => {
-            if (carousel.parentNode) carousel.parentNode.removeChild(carousel);
-        }, fadeDuration * 1000);
-    }
-});
+Hooks.once("init", () => CyberpunkerRedCarousel.init());
