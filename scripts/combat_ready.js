@@ -85,6 +85,7 @@ class CyberpunkerCombatControls {
     if (fade) fade.remove();
   }
 
+  // --- Combat start/end toggle ---
   static async toggleCombat() {
     const combat = game.combat;
     if (combat) {
@@ -96,23 +97,27 @@ class CyberpunkerCombatControls {
         return;
       }
 
+      // Create a new combat
       const newCombat = await Combat.create({ scene: canvas.scene.id });
-      await newCombat.createEmbeddedDocuments(
+
+      // Add selected tokens as combatants
+      const combatants = await newCombat.createEmbeddedDocuments(
         "Combatant",
         tokens.map(t => ({ tokenId: t.id }))
       );
 
-      // Roll initiative for any combatant that hasn't rolled yet
-      for (let c of newCombat.combatants) {
+      // Roll initiative if not already set
+      for (let c of combatants) {
         if (c.initiative === null) await c.rollInitiative({ chatMessage: false });
       }
 
-      // Sort combatants by initiative descending
+      // Sort by initiative descending
       newCombat.turns.sort((a, b) => (b.initiative ?? 0) - (a.initiative ?? 0));
 
-      // Set turn to the top combatant
+      // Set turn to the highest initiative combatant
       await newCombat.update({ turn: 0 });
 
+      // Start combat
       await newCombat.startCombat();
     }
 
