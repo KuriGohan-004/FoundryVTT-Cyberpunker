@@ -1,7 +1,7 @@
 // File: cyberpunker-combat.js
 
 class CyberpunkerCombatControls {
-  static BUTTON_ID = "cyberpunker-ready-combat";
+  static BUTTON_ID = "cyberpunker-combat-toggle";
 
   static init() {
     if (!game.user.isGM) return;
@@ -17,7 +17,7 @@ class CyberpunkerCombatControls {
 
     const btn = document.createElement("button");
     btn.id = this.BUTTON_ID;
-    btn.innerText = "Ready Combat";
+    btn.innerText = game.combat ? "End Combat" : "Ready Combat";
 
     Object.assign(btn.style, {
       background: "black",
@@ -37,10 +37,20 @@ class CyberpunkerCombatControls {
       overflow: "hidden"
     });
 
-    btn.addEventListener("click", () => this.readyCombat());
+    btn.addEventListener("click", () => this.toggleCombat(btn));
 
     const sidebar = document.getElementById("sidebar");
     if (sidebar) sidebar.appendChild(btn);
+  }
+
+  static async toggleCombat(button) {
+    if (game.combat) {
+      this.endCombat();
+      button.innerText = "Ready Combat";
+    } else {
+      await this.readyCombat();
+      button.innerText = "End Combat";
+    }
   }
 
   static async readyCombat() {
@@ -55,7 +65,7 @@ class CyberpunkerCombatControls {
       token.control({ releaseOthers: false });
     }
 
-    // Switch to Combat/Encounters tab
+    // Switch to Combat Encounters tab
     const combatTab = document.querySelector("#sidebar .directory[data-tab='combat']");
     if (combatTab) combatTab.click();
 
@@ -78,6 +88,12 @@ class CyberpunkerCombatControls {
     );
 
     ui.notifications.info(`Ready Combat: Added ${selectedTokens.length} tokens to new encounter.`);
+  }
+
+  static endCombat() {
+    if (game.combat) {
+      game.combat.endCombat();
+    }
   }
 
   static onCombatStart() {
