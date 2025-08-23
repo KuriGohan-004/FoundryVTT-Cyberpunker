@@ -59,19 +59,25 @@ class CyberpunkerCombatControls {
     const combatTab = document.querySelector("#sidebar .directory[data-tab='combat']");
     if (combatTab) combatTab.click();
 
-    // Create new combat encounter
+    // Wait a short moment to ensure tokens are selected
+    await new Promise(r => setTimeout(r, 50));
+
+    const selectedTokens = canvas.tokens.controlled;
+    if (!selectedTokens.length) {
+      ui.notifications.warn("No tokens selected to add to combat.");
+      return;
+    }
+
+    // Create new combat
     const newCombat = await Combat.create({ scene: canvas.scene.id });
 
     // Add all selected tokens as combatants
-    const selectedTokens = canvas.tokens.controlled;
-    if (!selectedTokens.length) return;
-
     await newCombat.createEmbeddedDocuments(
       "Combatant",
       selectedTokens.map(t => ({ tokenId: t.id }))
     );
 
-    ui.notifications.info("Ready Combat: All tokens added to new encounter.");
+    ui.notifications.info(`Ready Combat: Added ${selectedTokens.length} tokens to new encounter.`);
   }
 
   static onCombatStart() {
