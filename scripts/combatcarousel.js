@@ -1,38 +1,39 @@
-class CyberpunkerRed {
+class CyberpunkerRedCarousel {
   static ID = "cyberpunker-red";
-  static BAR_ID = "cyberpunker-red-carousel";
+  static carousel = null;
 
   static init() {
-    game.settings.register(this.ID, "enableCarousel", {
-      name: "Enable Combat Carousel",
-      hint: "Show the combat carousel when combat starts.",
+    // Register settings
+    game.settings.register(this.ID, "showCarousel", {
+      name: "Show Combat Carousel",
+      hint: "Enable or disable the combat carousel bar (GM only).",
       scope: "world",
       config: true,
       type: Boolean,
       default: true
     });
 
-    game.settings.register(this.ID, "rightPortraits", {
-      name: "Number of Right-Side Portraits",
-      hint: "How many combatants to display to the right of the current turn.",
+    game.settings.register(this.ID, "sidePortraits", {
+      name: "Right-Side Portraits",
+      hint: "How many portraits to show to the right of the active combatant.",
       scope: "world",
       config: true,
       type: Number,
-      default: 4
+      default: 2
     });
 
     game.settings.register(this.ID, "leftPortraits", {
-      name: "Number of Left-Side Portraits",
-      hint: "How many combatants to display to the left of the current turn.",
+      name: "Left-Side Portraits",
+      hint: "How many portraits to show to the left of the active combatant.",
       scope: "world",
       config: true,
       type: Number,
       default: 1
     });
 
-    game.settings.register(this.ID, "centerMode", {
-      name: "Center Camera on Turn Start",
-      hint: "Decide when the camera should center on the active token at the start of its turn.",
+    game.settings.register(this.ID, "autoCenterMode", {
+      name: "Auto-Center at Turn Start",
+      hint: "Choose when the view should center on the active combatant at the start of their turn.",
       scope: "world",
       config: true,
       type: String,
@@ -45,143 +46,138 @@ class CyberpunkerRed {
       }
     });
 
-    Hooks.on("combatStart", this.onCombatStart.bind(this));
-    Hooks.on("combatTurn", this.onCombatTurn.bind(this));
-    Hooks.on("combatEnd", this.onCombatEnd.bind(this));
+    Hooks.on("ready", () => {
+      if (game.combat && game.settings.get(this.ID, "showCarousel")) {
+        this.renderCarousel();
+      }
+    });
 
-    // Keyboard shortcut for ending turn
-    document.addEventListener("keydown", (ev) => {
+    Hooks.on("deleteCombat", () => this.removeCarousel());
+    Hooks.on("combatStart", () => {
+      if (game.settings.get(this.ID, "showCarousel")) this.renderCarousel();
+    });
+    Hooks.on("combatEnd", () => this.removeCarousel());
+    Hooks.on("updateCombat", (combat, update) => {
+      if (game.settings.get(this.ID, "showCarousel")) this.renderCarousel();
+
+      // Detect turn change
+      if (update?.turn !== undefined) {
+        this.handleTurnChange(combat.combatant);
+      }
+    });
+    Hooks.on("updateCombatant", () => {
+      if (game.settings.get(this.ID, "showCarousel")) this.renderCarousel();
+    });
+
+    // Keybind: End Turn with "E"
+    window.addEventListener("keydown", (ev) => {
       if (ev.key.toLowerCase() === "e") {
         this.tryEndTurn();
       }
     });
-  }
 
-  static onCombatStart(combat) {
-    if (!game.settings.get(this.ID, "enableCarousel")) return;
-    this.renderCarousel(combat);
-  }
-
-  static onCombatTurn(combat, updateData) {
-    if (!game.settings.get(this.ID, "enableCarousel")) return;
-    this.renderCarousel(combat);
-
-    // Center camera on start of turn based on GM setting
-    const combatant = combat.combatant;
-    if (combatant?.token?.object) {
-      if (this.shouldCenterOn(combatant)) {
-        canvas.animatePan({ x: combatant.token.object.x, y: combatant.token.object.y });
-      }
+    // Inject pulsing animation CSS once
+    if (!document.getElementById("cyberpunker-pulse-style")) {
+      const style = document.createElement("style");
+      style.id = "cyberpunker-pulse-style";
+      style.textContent = `
+        @keyframes cyberpunker-pulse {
+          0%   { opacity: 0.9; }
+          50%  { opacity: 0.5; }
+          100% { opacity: 0.9; }
+        }
+      `;
+      document.head.appendChild(style);
     }
   }
 
-  static onCombatEnd() {
-    const bar = document.getElementById(this.BAR_ID);
-    if (bar) bar.remove();
-  }
+  static renderCarousel() {
+    this.removeCarousel();
 
-  static shouldCenterOn(combatant) {
-    const mode = game.settings.get(this.ID, "centerMode");
-    const isGM = game.user.isGM;
-    const actor = combatant.actor;
+    if (!game.settings.get(this.ID, "showCarousel")) return;
 
-    if (!actor) return false;
+    const combat = game.combat;
+    if (!combat) return;
 
-    // Does this actor have *any* player ownership (online or offline)?
-    const ownedByPlayer = game.users.some(u => actor.ownership?.[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
-
-    switch (mode) {
-      case "off":
-        return false;
-
-      case "owned":
-        return isGM ? true : actor.isOwner;
-
-      case "party":
-        return isGM ? true : (actor.isOwner || ownedByPlayer);
-
-      case "all":
-        return true;
-
-      default:
-        return false;
-    }
-  }
-
-  static renderCarousel(combat) {
-    let bar = document.getElementById(this.BAR_ID);
-    if (!bar) {
-      bar = document.createElement("div");
-      bar.id = this.BAR_ID;
-      Object.assign(bar.style, {
-        position: "fixed",
-        top: "5px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        zIndex: 100,
-        pointerEvents: "auto"
-      });
-      document.body.appendChild(bar);
-    }
-    bar.innerHTML = "";
-
-    const currentIndex = combat.turn;
+    const turn = combat.turn;
     const combatants = combat.turns;
     if (!combatants.length) return;
 
-    const leftCount = game.settings.get(this.ID, "leftPortraits");
-    const rightCount = game.settings.get(this.ID, "rightPortraits");
+    const rightCount = game.settings.get(this.ID, "sidePortraits") || 2;
+    const leftCount = game.settings.get(this.ID, "leftPortraits") || 1;
 
-    const indices = [];
-    for (let i = currentIndex - leftCount; i <= currentIndex + rightCount; i++) {
-      if (i < 0 || i >= combatants.length) continue;
-      indices.push(i);
+    // Create container
+    const container = document.createElement("div");
+    container.id = `${this.ID}-carousel`;
+    Object.assign(container.style, {
+      position: "absolute",
+      top: "10px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      display: "flex",
+      gap: "10px",
+      alignItems: "flex-start",
+      zIndex: 100,
+      pointerEvents: "auto"
+    });
+
+    // Collect combatants: left side + current + right side
+    const ordered = [];
+
+    // Left side (previous turns)
+    for (let i = leftCount; i > 0; i--) {
+      const idx = (turn - i + combatants.length) % combatants.length;
+      ordered.push({ combatant: combatants[idx], isCurrent: false });
     }
 
-    for (let idx of indices) {
-      const combatant = combatants[idx];
-      const img = document.createElement("img");
-      img.src = combatant.token?.texture?.src || combatant.actor?.img || "";
-      img.draggable = false;
-      Object.assign(img.style, {
-        width: idx === currentIndex ? "96px" : "48px",
-        height: idx === currentIndex ? "96px" : "48px",
-        objectFit: "cover",
-        border: idx === currentIndex ? "4px solid red" : "2px solid gray",
-        boxShadow: idx === currentIndex ? "0 0 10px red" : "",
-        transition: "all 0.2s",
-        cursor: "pointer"
+    // Current
+    ordered.push({ combatant: combatants[turn], isCurrent: true });
+
+    // Right side (future turns)
+    for (let i = 1; i <= rightCount; i++) {
+      const idx = (turn + i) % combatants.length;
+      ordered.push({ combatant: combatants[idx], isCurrent: false });
+    }
+
+    // Build portraits
+    ordered.forEach(({ combatant, isCurrent }) => {
+      if (!combatant?.token) return;
+
+      const portraitWrapper = document.createElement("div");
+      portraitWrapper.style.display = "flex";
+      portraitWrapper.style.flexDirection = "column";
+      portraitWrapper.style.alignItems = "center";
+
+      const portrait = document.createElement("img");
+      portrait.src = combatant.token.texture.src;
+      portrait.draggable = false;
+      portrait.dataset.combatantId = combatant.id;
+
+      Object.assign(portrait.style, {
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        width: isCurrent ? "100px" : "50px",
+        height: isCurrent ? "100px" : "50px",
+        border: isCurrent ? "3px solid red" : "2px solid #444",
+        boxShadow: isCurrent ? "0 0 15px red" : "none",
+        objectFit: "cover"
       });
 
-      img.addEventListener("click", () => {
-        if (combatant.token?.object) {
-          canvas.animatePan({
-            x: combatant.token.object.x,
-            y: combatant.token.object.y
-          });
-        }
+      // Click to pan camera (no zoom now)
+      portrait.addEventListener("click", () => {
+        const t = canvas.tokens.get(combatant.token.id);
+        if (t) canvas.animatePan({ x: t.x, y: t.y });
       });
 
-      img.addEventListener("dblclick", () => {
-        if (combatant.actor?.sheet?.rendered) {
-          combatant.actor.sheet.maximize();
-        } else {
-          combatant.actor?.sheet?.render(true);
-        }
+      // Double-click to open sheet
+      portrait.addEventListener("dblclick", () => {
+        if (combatant.actor?.sheet) combatant.actor.sheet.render(true);
       });
 
-      const container = document.createElement("div");
-      container.style.display = "flex";
-      container.style.flexDirection = "column";
-      container.style.alignItems = "center";
+      portraitWrapper.appendChild(portrait);
 
-      container.appendChild(img);
-
-      // End Turn button under current token portrait
-      if (idx === currentIndex) {
+      // Add End Turn button for current token if conditions are met
+      if (isCurrent) {
         if (this.canEndTurn(combatant)) {
           const btn = document.createElement("button");
           btn.innerText = "End Turn";
@@ -198,66 +194,114 @@ class CyberpunkerRed {
             opacity: "0.9",
             animation: "cyberpunker-pulse 2s infinite"
           });
-          btn.addEventListener("click", () => this.tryEndTurn());
-          container.appendChild(btn);
 
-          // Inject pulse animation style once
-          if (!document.getElementById("cyberpunker-pulse-style")) {
-            const style = document.createElement("style");
-            style.id = "cyberpunker-pulse-style";
-            style.textContent = `
-              @keyframes cyberpunker-pulse {
-                0%   { opacity: 0.9; }
-                50%  { opacity: 0.5; }
-                100% { opacity: 0.9; }
-              }
-            `;
-            document.head.appendChild(style);
-          }
+          btn.addEventListener("click", () => {
+            combat?.nextTurn();
+          });
+
+          portraitWrapper.appendChild(btn);
         }
       }
 
-      bar.appendChild(container);
-    }
+      container.appendChild(portraitWrapper);
+    });
 
-    // Right-side arrow if more combatants remain
-    if (currentIndex + rightCount < combatants.length - 1) {
+    // Add right arrow if more combatants exist
+    const totalShown = 1 + leftCount + rightCount;
+    if (combatants.length > totalShown) {
       const arrow = document.createElement("div");
-      arrow.innerText = "➤";
+      arrow.innerText = "▶";
       Object.assign(arrow.style, {
         fontSize: "32px",
-        color: "white",
-        textShadow: "0 0 8px red",
-        filter: "drop-shadow(0 0 4px red)"
+        alignSelf: "center",
+        padding: "0 5px",
+        color: "red",
+        border: "2px solid red",
+        borderRadius: "4px",
+        textShadow: "0 0 5px red"
       });
-      bar.appendChild(arrow);
+      container.appendChild(arrow);
+    }
+
+    document.body.appendChild(container);
+    this.carousel = container;
+  }
+
+  static removeCarousel() {
+    if (this.carousel) {
+      this.carousel.remove();
+      this.carousel = null;
     }
   }
 
   static canEndTurn(combatant) {
+    const actor = combatant?.actor;
+    if (!actor) return false;
+
     const isGM = game.user.isGM;
-    if (isGM) {
-      // GM restriction: if owned by player or trusted player who is online, don't show button
-      const owners = game.users.filter(
-        u => u.active && (u.role >= CONST.USER_ROLES.PLAYER) && combatant.actor?.ownership?.[u.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER
-      );
-      if (owners.length > 0) return false;
-      return true;
-    } else {
-      return combatant.actor?.isOwner;
-    }
+    const isOwner = actor.isOwner;
+
+    // Check if some non-GM online owner exists
+    const owners = actor.ownership || {};
+    const hasOnlineOwner = Object.entries(owners).some(([userId, level]) => {
+      const u = game.users.get(userId);
+      return u?.active && level >= CONST.DOCUMENT_PERMISSION_LEVELS.OWNER && !u.isGM;
+    });
+
+    if ((isOwner && !isGM) || (isGM && !hasOnlineOwner)) return true;
+    return false;
   }
 
-  static async tryEndTurn() {
+  static tryEndTurn() {
     const combat = game.combat;
     if (!combat) return;
     const combatant = combat.combatant;
-    if (!combatant) return;
-    if (!this.canEndTurn(combatant)) return;
-    await combat.nextTurn();
+    if (combatant && this.canEndTurn(combatant)) {
+      combat.nextTurn();
+    }
+  }
+
+  static handleTurnChange(combatant) {
+    if (!combatant?.token) return;
+
+    const mode = game.settings.get(this.ID, "autoCenterMode");
+    if (mode === "off") return;
+
+    const actor = combatant.actor;
+    const isGM = game.user.isGM;
+    const isOwner = actor?.isOwner ?? false;
+
+    // Determine if this user should center
+    let shouldCenter = false;
+
+    if (isGM) {
+      shouldCenter = true; // GM always centers all
+    } else if (mode === "owned" && isOwner) {
+      shouldCenter = true;
+    } else if (mode === "party") {
+      if (isOwner) {
+        shouldCenter = true;
+      } else {
+        // check if owned by a player or trusted player
+        const owners = actor?.ownership || {};
+        shouldCenter = Object.entries(owners).some(([userId, level]) => {
+          const u = game.users.get(userId);
+          return (
+            u?.active &&
+            !u.isGM &&
+            level >= CONST.DOCUMENT_PERMISSION_LEVELS.OWNER
+          );
+        });
+      }
+    } else if (mode === "all") {
+      shouldCenter = true;
+    }
+
+    if (shouldCenter) {
+      const t = canvas.tokens.get(combatant.token.id);
+      if (t) canvas.animatePan({ x: t.x, y: t.y });
+    }
   }
 }
 
-Hooks.once("init", () => {
-  CyberpunkerRed.init();
-});
+Hooks.once("init", () => CyberpunkerRedCarousel.init());
