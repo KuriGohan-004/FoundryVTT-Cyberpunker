@@ -55,6 +55,20 @@ class CyberpunkerRedCarousel {
         this.tryEndTurn();
       }
     });
+
+    // Inject pulsing animation CSS once
+    if (!document.getElementById("cyberpunker-pulse-style")) {
+      const style = document.createElement("style");
+      style.id = "cyberpunker-pulse-style";
+      style.textContent = `
+        @keyframes cyberpunker-pulse {
+          0%   { opacity: 0.9; }
+          50%  { opacity: 0.5; }
+          100% { opacity: 0.9; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
   }
 
   static renderCarousel() {
@@ -156,7 +170,9 @@ class CyberpunkerRedCarousel {
             borderRadius: "4px",
             fontWeight: "bold",
             textShadow: "0 0 5px red",
-            cursor: "pointer"
+            cursor: "pointer",
+            opacity: "0.9",
+            animation: "cyberpunker-pulse 2s infinite"
           });
 
           btn.addEventListener("click", () => {
