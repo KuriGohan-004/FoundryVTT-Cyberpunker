@@ -11,7 +11,6 @@ class CyberpunkerRedHUD {
   static _getActiveToken() {
     const actor = this._getActiveActor();
     if (!actor) return null;
-    // Prefer a controlled token for this actor; else first matching token on the current canvas
     return canvas?.tokens?.controlled?.find(t => t.actor?.id === actor.id)
         || canvas?.tokens?.placeables?.find(t => t.actor?.id === actor.id)
         || null;
@@ -89,7 +88,7 @@ class CyberpunkerRedHUD {
     this.hudElement = $(`
       <div id="cyberpunker-red-hud" style="
         position: absolute;
-        bottom: 42px;          /* 2.1x of original 20px */
+        bottom: 50px;          /* HP bar raised */
         right: 320px;
         z-index: 100;
         display: flex;
@@ -104,8 +103,13 @@ class CyberpunkerRedHUD {
 
     const token = this._getActiveToken();
 
+    // Portrait (restored to 160x160px, 10px from bottom)
     const portrait = $(`
-      <div style="position: relative; display: inline-block;">
+      <div style="
+        position: relative;
+        display: inline-block;
+        margin-bottom: 10px;       /* Distance from bottom of screen */
+      ">
         <img src="${actor.img}" style="
           width: 160px;
           height: 160px;
@@ -135,7 +139,7 @@ class CyberpunkerRedHUD {
     const hpBar = $(`
       <div class="cpr-hp-wrap" style="
         position: relative;
-        width: 330px;            /* 220px + 50% extra to the left */
+        width: 330px;            /* 50% wider */
         height: 28px;
         background: #1b1b1b;
         border: 2px solid #000;
@@ -162,13 +166,14 @@ class CyberpunkerRedHUD {
           pointer-events: none;
         ">${Number.isFinite(current) ? current : 0}</div>
 
-        <div class="cpr-hp-name" style="
+        <!-- Character name (left side) -->
+        <div class="cpr-hp-name-left" style="
           position: absolute;
           left: 6px;
-          bottom: -25px;           /* 2.1x offset */
+          top: 50%;
+          transform: translateY(-50%);
           padding: 1px 6px;
           font-size: 12px;
-          line-height: 16px;
           font-weight: 700;
           color: #ffffff;
           background: rgba(0,0,0,0.6);
@@ -180,13 +185,12 @@ class CyberpunkerRedHUD {
       </div>
     `);
 
-    // Pulsing effect for low HP (<25%)
+    // Pulsing red effect for low HP (<25%)
     const fillEl = hpBar.find(".cpr-hp-fill");
     if (pct < 25) {
       fillEl.css("animation", "cpr-pulse-red 1s infinite alternate");
     }
 
-    // Add keyframes dynamically if not present
     if (!$("style#cpr-pulse-style").length) {
       $("head").append(`
         <style id="cpr-pulse-style">
