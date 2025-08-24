@@ -1,8 +1,7 @@
 Hooks.once("ready", () => {
-  // Add button after chat log is rendered
   Hooks.on("renderChatLog", (app, html) => {
-    // Prevent duplicate
-    if (html.find("#combat-toggle-button").length) return;
+    // Prevent duplicates
+    if ($("#combat-toggle-button").length) return;
 
     // Create button
     const button = $(`
@@ -19,28 +18,28 @@ Hooks.once("ready", () => {
       </button>
     `);
 
-    // Insert directly after chat log
-    html.after(button);
+    // Insert after the chat log inside the chat tab
+    html.parent().append(button);
 
     // Button logic
     button.on("click", async () => {
       const combat = game.combats.active;
 
       if (!combat) {
-        // Select all tokens on current scene
+        // Select all tokens
         canvas.tokens.placeables.forEach(t => t.control({ releaseOthers: false }));
 
         // Create new encounter
         const encounter = await Combat.create({ scene: canvas.scene.id });
         if (!encounter) return;
 
-        // Populate with tokens
+        // Add controlled tokens as combatants
         await encounter.createEmbeddedDocuments("Combatant", canvas.tokens.controlled.map(t => ({
           tokenId: t.id,
           sceneId: canvas.scene.id
         })));
 
-        // Make active
+        // Make encounter active
         await game.combats.setActive(encounter);
 
         // Switch to combat sidebar
