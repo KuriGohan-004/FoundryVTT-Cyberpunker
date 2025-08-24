@@ -108,7 +108,7 @@ class CyberpunkerRedHUD {
       <div style="
         position: relative;
         display: inline-block;
-        margin-bottom: 10px;       /* Distance from bottom of screen */
+        margin-bottom: -125px;       /* Distance from bottom of screen */
       ">
         <img src="${actor.img}" style="
           width: 160px;
@@ -145,7 +145,7 @@ class CyberpunkerRedHUD {
         border: 2px solid #000;
         border-radius: 6px;
         overflow: hidden;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
       ">
         <div class="cpr-hp-fill" style="
           width: ${pct}%;
