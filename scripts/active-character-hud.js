@@ -83,12 +83,12 @@ class ActiveCharacterHUD {
   static setActiveCharacter(actor) {
     if (!actor) return;
     ActiveCharacterHUD.activeCharacterId = actor.id;
-    game.user.setFlag("active-character-hud", "lastActive", actor.id);
+    game.settings.set("active-character-hud", "lastActive", actor.id);
     ActiveCharacterHUD.render();
   }
 
   static async restoreLastActive() {
-    const lastId = await game.user.getFlag("active-character-hud", "lastActive");
+    const lastId = game.settings.get("active-character-hud", "lastActive");
     let actor = game.actors.get(lastId);
 
     if (!actor) {
@@ -100,6 +100,16 @@ class ActiveCharacterHUD {
     if (actor) ActiveCharacterHUD.setActiveCharacter(actor);
   }
 }
+
+Hooks.once("init", () => {
+  // Register client-only setting (per-user)
+  game.settings.register("active-character-hud", "lastActive", {
+    scope: "client",
+    config: false,
+    type: String,
+    default: ""
+  });
+});
 
 Hooks.once("ready", async () => {
   ActiveCharacterHUD.init();
