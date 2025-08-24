@@ -108,7 +108,7 @@ class CyberpunkerRedHUD {
       <div style="
         position: relative;
         display: inline-block;
-        margin-bottom: -60px;       /* Distance from bottom of screen */
+        margin-bottom: -50px;       /* Distance from bottom of screen */
       ">
         <img src="${actor.img}" style="
           width: 160px;
