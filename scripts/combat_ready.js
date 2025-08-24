@@ -1,53 +1,37 @@
-// module.js
-Hooks.once("init", () => {
-  console.log("Quick Combat | Initializing module");
-});
+// File: scripts/scene-left-click-view.js
 
-// Add button to the UI
-Hooks.on("getSceneControlButtons", (controls) => {
-  controls.find(c => c.name === "token").tools.push({
-    name: "quickCombat",
-    title: "Quick Combat",
-    icon: "fas fa-swords", // any FontAwesome icon
-    visible: game.user.isGM,
-    onClick: async () => {
-      await quickCombat();
-    },
-    button: true
+Hooks.on("ready", () => {
+  // Patch the sidebar scene buttons
+  Hooks.on("renderSceneDirectory", (app, html, data) => {
+    html.find("li.scene").each((i, li) => {
+      const $li = $(li);
+
+      // Remove existing click listeners that open config
+      $li.off("click");
+
+      // Add our own click handler
+      $li.on("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const sceneId = $li.data("documentId");
+        const scene = game.scenes.get(sceneId);
+
+        if (scene) {
+          scene.view();
+        }
+      });
+
+      // Keep right-click behavior intact (context menu for config)
+      $li.on("contextmenu", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const sceneId = $li.data("documentId");
+        const scene = game.scenes.get(sceneId);
+
+        if (scene) scene.sheet.render(true);
+      });
+    });
   });
 });
-
-async function quickCombat() {
-  let combat = game.combat;
-
-  // If no combat, create one
-  if (!combat) {
-    combat = await Combat.create({ scene: canvas.scene.id });
-  }
-
-  // Select all placeable tokens
-  const tokens = canvas.tokens.placeables;
-
-  // Add them all to combat
-  for (let token of tokens) {
-    if (!combat.combatants.find(c => c.tokenId === token.id)) {
-      await combat.createEmbeddedDocuments("Combatant", [{
-        tokenId: token.id,
-        actorId: token.actor?.id,
-        sceneId: canvas.scene.id
-      }]);
-    }
-    // Toggle combat state ON
-    token.toggleCombat(true, { force: true });
-  }
-
-  // Switch sidebar to Combat
-  ui.sidebar.activateTab("combat");
-
-  // Make sure this encounter is the active one
-  if (game.combat?.id !== combat.id) {
-    await game.combats.setActive(combat.id);
-  }
-
-  ui.notifications.info("All tokens added to combat!");
-}
