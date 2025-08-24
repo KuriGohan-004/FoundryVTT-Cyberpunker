@@ -1,54 +1,53 @@
-Hooks.once("ready", () => {
-  // Only add once
-  if (document.getElementById("combat-toggle-button")) return;
+// module.js
+Hooks.once("init", () => {
+  console.log("Quick Combat | Initializing module");
+});
 
-  // Create button
-  const button = document.createElement("button");
-  button.id = "combat-toggle-button";
-  button.innerText = "⚔️";
-  Object.assign(button.style, {
-    position: "absolute",
-    right: "-25px",     // stick just outside the sidebar
-    top: "100px",       // vertical position, tweak as needed
-    width: "25px",
-    height: "25px",
-    fontSize: "14px",
-    lineHeight: "25px",
-    textAlign: "center",
-    padding: "0",
-    margin: "0",
-    zIndex: "1000"
-  });
-
-  // Append to the sidebar
-  document.getElementById("sidebar").appendChild(button);
-
-  // Button logic
-  button.addEventListener("click", async () => {
-    const combat = game.combats.active;
-
-    if (!combat) {
-      // Select all tokens
-      canvas.tokens.placeables.forEach(t => t.control({ releaseOthers: false }));
-
-      // Create new encounter
-      const encounter = await Combat.create({ scene: canvas.scene.id });
-      if (!encounter) return;
-
-      // Add controlled tokens
-      await encounter.createEmbeddedDocuments("Combatant", canvas.tokens.controlled.map(t => ({
-        tokenId: t.id,
-        sceneId: canvas.scene.id
-      })));
-
-      // Make encounter active
-      await game.combats.setActive(encounter);
-
-      // Switch to combat sidebar
-      ui.sidebar.activateTab("combat");
-    } else {
-      // End active combat
-      await combat.delete();
-    }
+// Add button to the UI
+Hooks.on("getSceneControlButtons", (controls) => {
+  controls.find(c => c.name === "token").tools.push({
+    name: "quickCombat",
+    title: "Quick Combat",
+    icon: "fas fa-swords", // any FontAwesome icon
+    visible: game.user.isGM,
+    onClick: async () => {
+      await quickCombat();
+    },
+    button: true
   });
 });
+
+async function quickCombat() {
+  let combat = game.combat;
+
+  // If no combat, create one
+  if (!combat) {
+    combat = await Combat.create({ scene: canvas.scene.id });
+  }
+
+  // Select all placeable tokens
+  const tokens = canvas.tokens.placeables;
+
+  // Add them all to combat
+  for (let token of tokens) {
+    if (!combat.combatants.find(c => c.tokenId === token.id)) {
+      await combat.createEmbeddedDocuments("Combatant", [{
+        tokenId: token.id,
+        actorId: token.actor?.id,
+        sceneId: canvas.scene.id
+      }]);
+    }
+    // Toggle combat state ON
+    token.toggleCombat(true, { force: true });
+  }
+
+  // Switch sidebar to Combat
+  ui.sidebar.activateTab("combat");
+
+  // Make sure this encounter is the active one
+  if (game.combat?.id !== combat.id) {
+    await game.combats.setActive(combat.id);
+  }
+
+  ui.notifications.info("All tokens added to combat!");
+}
