@@ -4,12 +4,11 @@ class ActiveCharacterHUD {
   static hudElement = null;
 
   static init() {
-    // Create HUD container
     ActiveCharacterHUD.hudElement = $(`
       <div id="active-character-hud" style="
         position: absolute;
         bottom: 20px;
-        right: 320px;  /* <-- left of the sidebar (default ~300px wide) */
+        right: 320px;  /* just left of sidebar */
         z-index: 100;
         pointer-events: auto;
       "></div>
@@ -35,7 +34,7 @@ class ActiveCharacterHUD {
         "/>
         <button class="combat-toggle" style="
           position: absolute;
-          top: -10px;
+          top: -12px;
           left: 50%;
           transform: translateX(-50%);
           display: none;
@@ -43,39 +42,85 @@ class ActiveCharacterHUD {
           color: white;
           border: 1px solid #666;
           border-radius: 4px;
-          padding: 1px 3px;
+          padding: 1px 6px;
           font-size: 12px;
           cursor: pointer;
-        ">⚔</button>
+        "></button>
       </div>
     `);
 
+    const button = portrait.find(".combat-toggle");
+
+    // update button label + state
+    function updateCombatButton() {
+      if (!token) return button.hide();
+
+      const combat = game.combats.active;
+      if (!combat) {
+        button.text("Ready").show();
+        return;
+      }
+
+      const combatant = combat.combatants.find(c => c.tokenId === token.id);
+      if (!combatant) {
+        button.text("Join").show();
+        return;
+      }
+
+      // In encounter already
+      if (combatant.initiative == null) {
+        button.text("Init").show();
+        return;
+      }
+
+      // Already rolled initiative → hide
+      button.hide();
+    }
+
+    updateCombatButton();
+
     // Hover shows combat toggle
     portrait.hover(
-      () => portrait.find(".combat-toggle").show(),
-      () => portrait.find(".combat-toggle").hide()
+      () => button.show(),
+      () => button.hide()
     );
 
-    // Click portrait → select & center token
+    // Single click → focus token
     portrait.find("img").click(() => {
       if (token) {
         token.control({ releaseOthers: true });
-        canvas.animatePan({ x: token.x, y: token.y, duration: 250 });
+        canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
       }
     });
 
-    // Toggle combat state
-    portrait.find(".combat-toggle").click(async (ev) => {
+    // Double click → open sheet
+    portrait.find("img").dblclick(() => {
+      if (actor?.sheet) actor.sheet.render(true);
+    });
+
+    // Button click actions
+    button.click(async (ev) => {
       ev.stopPropagation();
       if (!token) return;
-      const combat = game.combats.active || await Combat.create({ scene: canvas.scene.id });
-      let combatant = combat.combatants.find(c => c.tokenId === token.id);
-      if (combatant) {
-        await combatant.delete();
-      } else {
-        await combat.createEmbeddedDocuments("Combatant", [{ tokenId: token.id, actorId: actor.id }]);
+
+      let combat = game.combats.active;
+      if (!combat) {
+        combat = await Combat.create({ scene: canvas.scene.id });
       }
+
+      let combatant = combat.combatants.find(c => c.tokenId === token.id);
+
+      if (!combatant) {
+        await combat.createEmbeddedDocuments("Combatant", [{ tokenId: token.id, actorId: actor.id }]);
+      } else if (combatant.initiative == null) {
+        await combatant.rollInitiative();
+      }
+      updateCombatButton();
     });
+
+    // Update button when combat state changes
+    Hooks.on("updateCombat", () => updateCombatButton());
+    Hooks.on("deleteCombat", () => updateCombatButton());
 
     ActiveCharacterHUD.hudElement.append(portrait);
   }
@@ -92,7 +137,6 @@ class ActiveCharacterHUD {
     let actor = game.actors.get(lastId);
 
     if (!actor) {
-      // fallback: find first owned actor in scene
       const token = canvas.tokens.placeables.find(t => t.actor?.isOwner);
       actor = token?.actor || game.actors.find(a => a.isOwner);
     }
@@ -107,7 +151,7 @@ class ActiveCharacterHUD {
     if (!token) return;
 
     token.control({ releaseOthers: true });
-    canvas.animatePan({ x: token.x, y: token.y, duration: 250 });
+    canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
   }
 }
 
@@ -124,7 +168,6 @@ Hooks.once("ready", async () => {
   ActiveCharacterHUD.init();
   await ActiveCharacterHUD.restoreLastActive();
 
-  // Clicking on a controlled token sets it as active
   Hooks.on("controlToken", (token, controlled) => {
     if (controlled && token.actor?.isOwner) {
       ActiveCharacterHUD.setActiveCharacter(token.actor);
@@ -135,7 +178,6 @@ Hooks.once("ready", async () => {
   window.addEventListener("keydown", (ev) => {
     const activeId = ActiveCharacterHUD.activeCharacterId;
     if (!activeId) return;
-
     const actor = game.actors.get(activeId);
     if (!actor) return;
 
@@ -152,11 +194,15 @@ Hooks.once("ready", async () => {
       ActiveCharacterHUD.focusActiveToken();
     }
 
-    // Movement keys auto-select if nothing controlled
+    // Movement keys → ensure token selected and pan to them
     const moveKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
     if (moveKeys.includes(ev.key.toLowerCase())) {
-      if (canvas.tokens.controlled.length === 0) {
+      const token = canvas.tokens.controlled[0];
+      if (!token) {
         ActiveCharacterHUD.focusActiveToken();
+      } else {
+        // Always recenter on the controlled token
+        canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 200 });
       }
     }
   });
