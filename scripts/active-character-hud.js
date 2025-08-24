@@ -17,16 +17,10 @@ class CyberpunkerRedHUD {
         || null;
   }
 
-  /**
-   * Resolve HP from various data shapes.
-   * Priority: world setting path -> default path -> common fallbacks (case-insensitive)
-   * Supports shapes: number | {value,max} | {current,max} | {value:{current,max}} | etc.
-   */
   static _resolveHP(actor) {
     const hpPath = game.settings.get("cyberpunker-red", "hpAttribute") || "system.derivedStats.HP";
     let node = foundry.utils.getProperty(actor, hpPath);
 
-    // Try common fallbacks if the configured path isn't found.
     const fallbacks = [
       "system.derivedStats.HP",
       "system.derivedStats.hp",
@@ -42,20 +36,13 @@ class CyberpunkerRedHUD {
       node = foundry.utils.getProperty(actor, fb);
     }
 
-    // Normalize shapes into { current, max }
     const normalize = (hpNode) => {
       if (hpNode == null) return { current: 0, max: 0 };
-
-      if (typeof hpNode === "number") {
-        // If it's just a number, treat as current with unknown max
-        return { current: Number(hpNode) || 0, max: Number(hpNode) || 0 };
-      }
+      if (typeof hpNode === "number") return { current: Number(hpNode) || 0, max: Number(hpNode) || 0 };
 
       if (typeof hpNode === "object") {
-        // common direct keys
         const curKeys = ["value", "current", "now", "hp", "curr"];
         const maxKeys = ["max", "maximum", "maxValue", "cap", "base", "total"];
-
         const dig = (obj, keys) => {
           for (const k of keys) {
             if (obj?.[k] != null && typeof obj[k] !== "object") return Number(obj[k]);
@@ -66,36 +53,23 @@ class CyberpunkerRedHUD {
         let current = dig(hpNode, curKeys);
         let max = dig(hpNode, maxKeys);
 
-        // sometimes nested in .value
-        if (current == null && typeof hpNode.value === "object") {
-          current = dig(hpNode.value, curKeys);
-        }
-        if (max == null && typeof hpNode.value === "object") {
-          max = dig(hpNode.value, maxKeys);
-        }
+        if (current == null && typeof hpNode.value === "object") current = dig(hpNode.value, curKeys);
+        if (max == null && typeof hpNode.value === "object") max = dig(hpNode.value, maxKeys);
 
-        // Try very common CR-style shapes: { value: { current, max } }
-        if (current == null && typeof hpNode.value === "object" && hpNode.value?.current != null) {
-          current = Number(hpNode.value.current);
-        }
-        if (max == null && typeof hpNode.value === "object" && hpNode.value?.max != null) {
-          max = Number(hpNode.value.max);
-        }
+        if (current == null && typeof hpNode.value === "object" && hpNode.value?.current != null) current = Number(hpNode.value.current);
+        if (max == null && typeof hpNode.value === "object" && hpNode.value?.max != null) max = Number(hpNode.value.max);
 
-        // If still missing max, fall back to current to avoid NaN
         if (current == null) current = 0;
         if (max == null) max = current;
 
         return { current, max };
       }
 
-      // Anything else
       return { current: 0, max: 0 };
     };
 
     const { current, max } = normalize(node);
 
-    // If GM and nothing was found, warn once per actor (non-blocking)
     if (game.user.isGM && current === 0 && max === 0 && node == null) {
       console.warn(`[Cyberpunker Red] HP path not found for actor "${actor.name}". Checked:`, [hpPath, ...fallbacks]);
     }
@@ -110,14 +84,13 @@ class CyberpunkerRedHUD {
 
   // ---------- Core UI ----------
   static _buildHUD() {
-    // Remove and rebuild fresh
     this.hudElement?.remove();
 
     this.hudElement = $(`
       <div id="cyberpunker-red-hud" style="
         position: absolute;
-        bottom: 20px;
-        right: 320px;                 /* Left of sidebar */
+        bottom: 42px;          /* 2.1x of original 20px */
+        right: 320px;
         z-index: 100;
         display: flex;
         align-items: flex-end;
@@ -131,7 +104,6 @@ class CyberpunkerRedHUD {
 
     const token = this._getActiveToken();
 
-    // --- Portrait (160px, click selects+pan if token exists; dblclick opens sheet) ---
     const portrait = $(`
       <div style="position: relative; display: inline-block;">
         <img src="${actor.img}" style="
@@ -145,7 +117,7 @@ class CyberpunkerRedHUD {
     `);
 
     portrait.find("img").on("click", () => {
-      if (!token) return; // No token → do nothing (no pan)
+      if (!token) return;
       token.control({ releaseOthers: true });
       canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
     });
@@ -154,25 +126,22 @@ class CyberpunkerRedHUD {
       actor.sheet?.render(true);
     });
 
-    // --- Stat HUD (HP bar only; keep raised position) ---
     const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-start;"></div>`);
 
-    // Resolve HP (prefer token's current actor data if available; otherwise base actor)
     const sourceActor = token?.actor ?? actor;
     const { current, max } = this._resolveHP(sourceActor);
     const pct = this._pct(current, max);
 
-    // HP bar: vibrant red fill; right-aligned current number; name 50% on/50% off at bottom-left
     const hpBar = $(`
       <div class="cpr-hp-wrap" style="
         position: relative;
-        width: 220px;
+        width: 330px;            /* 220px + 50% extra to the left */
         height: 28px;
         background: #1b1b1b;
         border: 2px solid #000;
         border-radius: 6px;
         overflow: hidden;
-        margin-bottom: 8px;          /* keeps the 'raised' feel above baseline */
+        margin-bottom: 8px;
       ">
         <div class="cpr-hp-fill" style="
           width: ${pct}%;
@@ -181,7 +150,6 @@ class CyberpunkerRedHUD {
           transition: width 0.25s ease;
         "></div>
 
-        <!-- Current HP number (right-aligned, its own text object, no border) -->
         <div class="cpr-hp-current" style="
           position: absolute;
           top: 50%;
@@ -194,13 +162,12 @@ class CyberpunkerRedHUD {
           pointer-events: none;
         ">${Number.isFinite(current) ? current : 0}</div>
 
-        <!-- Character name (smaller, translucent black background, half-on/half-off bottom-left) -->
         <div class="cpr-hp-name" style="
           position: absolute;
           left: 6px;
-          bottom: -12px;             /* ~half outside the 28px bar */
+          bottom: -25px;           /* 2.1x offset */
           padding: 1px 6px;
-          font-size: 12px;           /* slightly smaller */
+          font-size: 12px;
           line-height: 16px;
           font-weight: 700;
           color: #ffffff;
@@ -213,9 +180,26 @@ class CyberpunkerRedHUD {
       </div>
     `);
 
-    statHud.append(hpBar);
+    // Pulsing effect for low HP (<25%)
+    const fillEl = hpBar.find(".cpr-hp-fill");
+    if (pct < 25) {
+      fillEl.css("animation", "cpr-pulse-red 1s infinite alternate");
+    }
 
-    // Assemble
+    // Add keyframes dynamically if not present
+    if (!$("style#cpr-pulse-style").length) {
+      $("head").append(`
+        <style id="cpr-pulse-style">
+          @keyframes cpr-pulse-red {
+            0% { background-color: #ff2a2a; }
+            50% { background-color: #ff0000; }
+            100% { background-color: #ff2a2a; }
+          }
+        </style>
+      `);
+    }
+
+    statHud.append(hpBar);
     this.hudElement.append(statHud, portrait);
   }
 
@@ -230,7 +214,6 @@ class CyberpunkerRedHUD {
     const lastId = game.settings.get("cyberpunker-red", "lastActive");
     let actor = game.actors.get(lastId);
     if (!actor) {
-      // fallback: any owned token in-scene, else any owned actor
       const tok = canvas.tokens.placeables.find(t => t.actor?.isOwner);
       actor = tok?.actor || game.actors.find(a => a.isOwner);
     }
@@ -244,20 +227,11 @@ class CyberpunkerRedHUD {
     canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
   }
 
-  // Re-render when relevant data changes
   static _wireDataRefresh() {
-    Hooks.on("updateActor", (doc) => {
-      if (doc.id === this.activeCharacterId) this._buildHUD();
-    });
-    Hooks.on("updateToken", (doc) => {
-      if (doc.actorId === this.activeCharacterId) this._buildHUD();
-    });
-    Hooks.on("deleteToken", (doc) => {
-      if (doc.actorId === this.activeCharacterId) this._buildHUD();
-    });
-    Hooks.on("createToken", (doc) => {
-      if (doc.actorId === this.activeCharacterId) this._buildHUD();
-    });
+    Hooks.on("updateActor", (doc) => { if (doc.id === this.activeCharacterId) this._buildHUD(); });
+    Hooks.on("updateToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
+    Hooks.on("deleteToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
+    Hooks.on("createToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
     Hooks.on("controlToken", (token, controlled) => {
       if (controlled && token.actor?.isOwner) this.setActiveCharacter(token.actor);
     });
@@ -266,7 +240,6 @@ class CyberpunkerRedHUD {
 
 // ---------- Hooks ----------
 Hooks.once("init", () => {
-  // Settings live under the Cyberpunker Red namespace
   game.settings.register("cyberpunker-red", "lastActive", {
     scope: "client",
     config: false,
@@ -285,40 +258,30 @@ Hooks.once("init", () => {
 });
 
 Hooks.once("ready", async () => {
-  // Build UI and restore selection
   await CyberpunkerRedHUD.restoreLastActive();
   CyberpunkerRedHUD._wireDataRefresh();
-
-  // Build once if not built (e.g., no active found)
   if (!CyberpunkerRedHUD.hudElement) CyberpunkerRedHUD._buildHUD();
 
-  // Keyboard shortcuts
   window.addEventListener("keydown", (ev) => {
     const actor = CyberpunkerRedHUD._getActiveActor();
     if (!actor) return;
 
-    // Tab toggles the actor sheet
     if (ev.key === "Tab") {
       ev.preventDefault();
       if (actor.sheet?.rendered) actor.sheet.close();
       else actor.sheet?.render(true);
     }
 
-    // Q focuses active token
     if (ev.key.toLowerCase() === "q") {
       ev.preventDefault();
       CyberpunkerRedHUD.focusActiveToken();
     }
 
-    // Movement keys → recenter on controlled token, else on active token if available
     const moveKeys = ["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"];
     if (moveKeys.includes(ev.key.toLowerCase())) {
       const token = canvas.tokens.controlled[0];
-      if (token) {
-        canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 200 });
-      } else {
-        CyberpunkerRedHUD.focusActiveToken();
-      }
+      if (token) canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 200 });
+      else CyberpunkerRedHUD.focusActiveToken();
     }
   });
 });
