@@ -2,33 +2,53 @@
 class ActiveCharacterHUD {
   static activeCharacterId = null;
   static hudElement = null;
+  static macroSlots = [];
 
   static init() {
+    // Settings
+    game.settings.register("active-character-hud", "lastActive", {
+      scope: "client",
+      config: false,
+      type: String,
+      default: ""
+    });
+
+    game.settings.register("active-character-hud", "hpAttribute", {
+      name: "HP Attribute Path",
+      hint: "Enter the system data path for the HP resource (default: system.attributes.hp). Example: system.health",
+      scope: "world",
+      config: true,
+      type: String,
+      default: "system.attributes.hp"
+    });
+
+    game.settings.register("active-character-hud", "macros", {
+      scope: "client",
+      config: false,
+      type: Array,
+      default: [null, null, null, null, null]
+    });
+  }
+
+  static render() {
+    ActiveCharacterHUD.hudElement?.remove();
     ActiveCharacterHUD.hudElement = $(`
       <div id="active-character-hud" style="
         position: absolute;
         bottom: 20px;
-        right: 320px;  /* just left of sidebar */
+        right: 320px;
         z-index: 100;
-        pointer-events: auto;
         display: flex;
-        flex-direction: row;
         align-items: flex-end;
-        gap: 12px;
+        gap: 10px;
+        pointer-events: auto;
       "></div>
     `).appendTo(document.body);
-  }
 
-  static render() {
-    ActiveCharacterHUD.hudElement.empty();
     const actor = game.actors.get(ActiveCharacterHUD.activeCharacterId);
     if (!actor) return;
 
-    // Try to find an active token
-    const token = canvas.tokens.controlled.find(t => t.actor.id === actor.id) 
-      || canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
-
-    // -------- Portrait --------
+    // --- Portrait ---
     const portrait = $(`
       <div style="position: relative; display: inline-block;">
         <img src="${actor.img}" style="
@@ -41,106 +61,88 @@ class ActiveCharacterHUD {
       </div>
     `);
 
-    // Single click → focus token (if exists)
+    const token = canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
     portrait.find("img").click(() => {
       if (token) {
         token.control({ releaseOthers: true });
         canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
       }
     });
+    portrait.find("img").dblclick(() => actor.sheet?.render(true));
 
-    // Double click → open sheet
-    portrait.find("img").dblclick(() => {
-      if (actor?.sheet) actor.sheet.render(true);
-    });
+    // --- Stat HUD ---
+    const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-start;"></div>`);
 
-    // -------- Stat HUD --------
-    const hp = token?.actor?.system?.attributes?.hp ?? actor.system?.attributes?.hp;
-    const value = hp?.value ?? 0;
-    const max = hp?.max ?? 0;
-    const pct = max > 0 ? Math.clamped(value / max, 0, 1) : 0;
+    // Health bar
+    const hpPath = game.settings.get("active-character-hud", "hpAttribute");
+    const hpData = foundry.utils.getProperty(actor, hpPath) || {};
+    const current = hpData.value ?? 0;
+    const max = hpData.max ?? 0;
+    const pct = max > 0 ? Math.max(0, Math.min(100, (current / max) * 100)) : 0;
 
-    const statHud = $(`
-      <div style="
-        display: flex;
-        flex-direction: column;
-        align-items: stretch;
-        justify-content: flex-end;
-        width: 220px;
-      ">
-        <div class="macro-bar" style="
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 6px;
-        "></div>
-        <div style="
-          position: relative;
-          height: 28px;
-          background: #550000;
-          border: 2px solid #333;
-          border-radius: 6px;
-          overflow: hidden;
-        ">
-          <div class="hp-fill" style="
-            height: 100%;
-            width: ${pct * 100}%;
-            background: linear-gradient(to right, #cc0000, #ff4444);
-            transition: width 0.3s ease;
-          "></div>
-          <div style="
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            background: rgba(0,0,0,0.6);
-            padding: 2px 6px;
-            font-size: 12px;
-            color: white;
-            font-weight: bold;
-            border-top-right-radius: 4px;
-          ">
-            ${actor.name} — ${value}/${max}
-          </div>
-        </div>
+    const hpBar = $(`
+      <div style="position: relative; width: 180px; height: 28px; background: #222; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 8px;">
+        <div class="bar" style="width: ${pct}%; height: 100%; background: #ff1a1a;"></div>
+        <div class="hp-text" style="
+          position: absolute;
+          top: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          font-size: 14px;
+          font-weight: bold;
+          color: white;
+          text-shadow: 1px 1px 2px black;
+        ">${current} / ${max}</div>
+        <div class="hp-name" style="
+          position: absolute;
+          bottom: -12px;
+          left: 5px;
+          background: rgba(0,0,0,0.6);
+          color: white;
+          font-weight: bold;
+          padding: 0 4px;
+          border-radius: 4px;
+        ">${actor.name}</div>
       </div>
     `);
 
-    // -------- Macro bar --------
-    const macroBar = statHud.find(".macro-bar");
-    const macros = ActiveCharacterHUD.loadMacros();
+    statHud.append(hpBar);
 
+    // Macro bar
+    const savedMacros = game.settings.get("active-character-hud", "macros");
+    const macroBar = $('<div class="macro-bar" style="display: flex; gap: 4px;"></div>');
     for (let i = 0; i < 5; i++) {
-      const macro = macros[i] ? game.macros.get(macros[i]) : null;
-      const slot = $(`
-        <div style="
-          width: 40px;
-          height: 40px;
-          border: 2px solid #333;
-          border-radius: 6px;
-          background: #222;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-        ">
-          ${macro ? `<img src="${macro.img}" style="width: 90%; height: 90%; object-fit: contain;" />` : ""}
-        </div>
-      `);
+      const slot = $(`<div class="macro-slot" style="
+        width: 36px;
+        height: 36px;
+        border: 2px solid #555;
+        background: rgba(0,0,0,0.4);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      "></div>`);
 
-      slot.click(async (ev) => {
+      const macroId = savedMacros[i];
+      if (macroId) {
+        const macro = game.macros.get(macroId);
         if (macro) {
-          macro.execute();
-        } else {
-          ui.notifications.info("Empty Macro Slot");
+          const icon = $(`<img src="${macro.img}" style="width: 100%; height: 100%; border-radius: 4px;">`);
+          slot.append(icon);
+          slot.on("click", () => macro.execute());
         }
-      });
+      }
 
-      // Right-click to assign macro
-      slot.contextmenu(async (ev) => {
+      // Drag + drop
+      slot.on("dragover", ev => ev.preventDefault());
+      slot.on("drop", async ev => {
         ev.preventDefault();
-        const macroId = await ActiveCharacterHUD.pickMacro();
-        if (macroId) {
-          macros[i] = macroId;
-          ActiveCharacterHUD.saveMacros(macros);
+        const data = JSON.parse(ev.originalEvent.dataTransfer.getData("text/plain"));
+        if (data.type === "Macro") {
+          const newMacros = [...savedMacros];
+          newMacros[i] = data.id;
+          await game.settings.set("active-character-hud", "macros", newMacros);
           ActiveCharacterHUD.render();
         }
       });
@@ -148,7 +150,10 @@ class ActiveCharacterHUD {
       macroBar.append(slot);
     }
 
-    ActiveCharacterHUD.hudElement.append(statHud, portrait);
+    statHud.append(macroBar);
+
+    ActiveCharacterHUD.hudElement.append(statHud);
+    ActiveCharacterHUD.hudElement.append(portrait);
   }
 
   static setActiveCharacter(actor) {
@@ -161,12 +166,10 @@ class ActiveCharacterHUD {
   static async restoreLastActive() {
     const lastId = game.settings.get("active-character-hud", "lastActive");
     let actor = game.actors.get(lastId);
-
     if (!actor) {
       const token = canvas.tokens.placeables.find(t => t.actor?.isOwner);
       actor = token?.actor || game.actors.find(a => a.isOwner);
     }
-
     if (actor) ActiveCharacterHUD.setActiveCharacter(actor);
   }
 
@@ -175,75 +178,18 @@ class ActiveCharacterHUD {
     if (!actor) return;
     const token = canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
     if (!token) return;
-
     token.control({ releaseOthers: true });
     canvas.animatePan({ x: token.center.x, y: token.center.y, duration: 250 });
   }
-
-  // ---- Macro save/load ----
-  static loadMacros() {
-    return game.settings.get("active-character-hud", "macros") ?? [null, null, null, null, null];
-  }
-
-  static saveMacros(macros) {
-    game.settings.set("active-character-hud", "macros", macros);
-  }
-
-  static async pickMacro() {
-    return new Promise((resolve) => {
-      new Dialog({
-        title: "Assign Macro",
-        content: "<p>Select a Macro from your hotbar or macro directory.</p>",
-        buttons: {
-          choose: {
-            label: "Choose",
-            callback: async () => {
-              const macros = game.macros.filter(m => m.isOwner);
-              const list = macros.map(m => `<option value="${m.id}">${m.name}</option>`).join("");
-              const dlg = new Dialog({
-                title: "Select Macro",
-                content: `<select id="macro-choice">${list}</select>`,
-                buttons: {
-                  ok: {
-                    label: "OK",
-                    callback: (html) => resolve(html.find("#macro-choice").val())
-                  },
-                  cancel: { label: "Cancel", callback: () => resolve(null) }
-                }
-              });
-              dlg.render(true);
-            }
-          },
-          cancel: { label: "Cancel", callback: () => resolve(null) }
-        }
-      }).render(true);
-    });
-  }
 }
 
-Hooks.once("init", () => {
-  game.settings.register("active-character-hud", "lastActive", {
-    scope: "client",
-    config: false,
-    type: String,
-    default: ""
-  });
-  game.settings.register("active-character-hud", "macros", {
-    scope: "client",
-    config: false,
-    type: Array,
-    default: [null, null, null, null, null]
-  });
-});
+Hooks.once("init", () => ActiveCharacterHUD.init());
 
 Hooks.once("ready", async () => {
-  ActiveCharacterHUD.init();
   await ActiveCharacterHUD.restoreLastActive();
 
   Hooks.on("controlToken", (token, controlled) => {
-    if (controlled && token.actor?.isOwner) {
-      ActiveCharacterHUD.setActiveCharacter(token.actor);
-    }
+    if (controlled && token.actor?.isOwner) ActiveCharacterHUD.setActiveCharacter(token.actor);
   });
 
   // Keyboard shortcuts
@@ -266,8 +212,8 @@ Hooks.once("ready", async () => {
       ActiveCharacterHUD.focusActiveToken();
     }
 
-    // Movement keys → always recenter on controlled or active token
-    const moveKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
+    // Movement keys
+    const moveKeys = ["w","a","s","d","arrowup","arrowdown","arrowleft","arrowright"];
     if (moveKeys.includes(ev.key.toLowerCase())) {
       const token = canvas.tokens.controlled[0];
       if (token) {
