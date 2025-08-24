@@ -16,24 +16,6 @@ class CyberpunkerTokenBar {
     bar.style.pointerEvents = "auto";
     document.body.appendChild(bar);
 
-    // Register settings
-    game.settings.register("cyberpunker-red", "sheetHotkey", {
-      name: "Sheet Toggle Hotkey",
-      hint: "Press this key to toggle the sheet of your currently selected token.",
-      scope: "client",
-      config: true,
-      type: String,
-      default: "Tab"
-    });
-
-    // Hotkey listener
-    window.addEventListener("keydown", ev => {
-      const settingKey = game.settings.get("cyberpunker-red", "sheetHotkey").toLowerCase();
-      if (ev.key.toLowerCase() === settingKey) {
-        CyberpunkerTokenBar.toggleSelectedSheet();
-      }
-    });
-
     // Re-render on relevant hooks
     Hooks.on("updateScene", () => CyberpunkerTokenBar.render());
     Hooks.on("updateToken", () => CyberpunkerTokenBar.render());
@@ -106,9 +88,9 @@ class CyberpunkerTokenBar {
       bar.appendChild(img);
     }
   }
+}
 
 // Initialize when ready
 Hooks.once("ready", () => {
   CyberpunkerTokenBar.init();
 });
-
