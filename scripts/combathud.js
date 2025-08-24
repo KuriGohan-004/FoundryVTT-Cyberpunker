@@ -107,26 +107,8 @@ class CyberpunkerTokenBar {
     }
   }
 
-  static toggleSelectedSheet() {
-    const selected = canvas.tokens.controlled;
-    if (!selected.length) return;
-
-    // Find first selected token you can at least observe
-    const token = selected.find(t =>
-      game.user.isGM ||
-      t.actor?.ownership[game.user.id] >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
-    );
-    if (!token) return;
-
-    const sheet = token.actor?.sheet;
-    if (!sheet) return;
-
-    if (sheet.rendered) sheet.close();
-    else sheet.render(true);
-  }
-}
-
 // Initialize when ready
 Hooks.once("ready", () => {
   CyberpunkerTokenBar.init();
 });
+
