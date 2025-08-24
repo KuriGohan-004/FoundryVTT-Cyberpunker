@@ -9,7 +9,7 @@ class ActiveCharacterHUD {
       <div id="active-character-hud" style="
         position: absolute;
         bottom: 20px;
-        right: 20px;
+        right: 320px;  /* <-- left of the sidebar (default ~300px wide) */
         z-index: 100;
         pointer-events: auto;
       "></div>
@@ -27,15 +27,15 @@ class ActiveCharacterHUD {
     const portrait = $(`
       <div style="position: relative; display: inline-block;">
         <img src="${actor.img}" style="
-          width: 64px;
-          height: 64px;
-          border-radius: 8px;
-          border: 2px solid #444;
+          width: 160px;
+          height: 160px;
+          border-radius: 12px;
+          border: 3px solid #444;
           cursor: pointer;
         "/>
         <button class="combat-toggle" style="
           position: absolute;
-          top: -8px;
+          top: -10px;
           left: 50%;
           transform: translateX(-50%);
           display: none;
@@ -43,8 +43,8 @@ class ActiveCharacterHUD {
           color: white;
           border: 1px solid #666;
           border-radius: 4px;
-          padding: 2px 4px;
-          font-size: 10px;
+          padding: 1px 3px;
+          font-size: 12px;
           cursor: pointer;
         ">⚔</button>
       </div>
@@ -99,10 +99,19 @@ class ActiveCharacterHUD {
 
     if (actor) ActiveCharacterHUD.setActiveCharacter(actor);
   }
+
+  static focusActiveToken() {
+    const actor = game.actors.get(ActiveCharacterHUD.activeCharacterId);
+    if (!actor) return;
+    const token = canvas.tokens.placeables.find(t => t.actor?.id === actor.id);
+    if (!token) return;
+
+    token.control({ releaseOthers: true });
+    canvas.animatePan({ x: token.x, y: token.y, duration: 250 });
+  }
 }
 
 Hooks.once("init", () => {
-  // Register client-only setting (per-user)
   game.settings.register("active-character-hud", "lastActive", {
     scope: "client",
     config: false,
@@ -122,14 +131,33 @@ Hooks.once("ready", async () => {
     }
   });
 
-  // Tab toggles sheet of active character
+  // Keyboard shortcuts
   window.addEventListener("keydown", (ev) => {
-    if (ev.key === "Tab" && ActiveCharacterHUD.activeCharacterId) {
+    const activeId = ActiveCharacterHUD.activeCharacterId;
+    if (!activeId) return;
+
+    const actor = game.actors.get(activeId);
+    if (!actor) return;
+
+    // Tab toggles sheet
+    if (ev.key === "Tab") {
       ev.preventDefault();
-      const actor = game.actors.get(ActiveCharacterHUD.activeCharacterId);
-      if (!actor) return;
       if (actor.sheet.rendered) actor.sheet.close();
       else actor.sheet.render(true);
+    }
+
+    // Q focuses token
+    if (ev.key.toLowerCase() === "q") {
+      ev.preventDefault();
+      ActiveCharacterHUD.focusActiveToken();
+    }
+
+    // Movement keys auto-select if nothing controlled
+    const moveKeys = ["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"];
+    if (moveKeys.includes(ev.key.toLowerCase())) {
+      if (canvas.tokens.controlled.length === 0) {
+        ActiveCharacterHUD.focusActiveToken();
+      }
     }
   });
 });
