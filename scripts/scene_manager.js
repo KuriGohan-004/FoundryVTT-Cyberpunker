@@ -4,6 +4,8 @@ Hooks.on("ready", () => {
   Hooks.on("renderSceneDirectory", (app, html, data) => {
     html.find("li.scene").each((i, li) => {
       const $li = $(li);
+      const sceneId = $li.data("documentId");
+      const scene = game.scenes.get(sceneId);
 
       // Remove default click handlers
       $li.off("click");
@@ -12,23 +14,15 @@ Hooks.on("ready", () => {
       $li.on("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
-
-        const sceneId = $li.data("documentId");
-        const scene = game.scenes.get(sceneId);
         if (scene) scene.view();
       });
 
-      // Double click -> activate
-      $li.on("dblclick", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const sceneId = $li.data("documentId");
-        const scene = game.scenes.get(sceneId);
-        if (scene && game.user.isGM) scene.activate();
-      });
-
-      // Right-click is left alone so Foundry’s normal context menu still works
+      // Add an icon for the active scene
+      $li.find(".scene-active-indicator").remove(); // cleanup if re-rendered
+      if (scene && scene.active) {
+        const icon = $(`<i class="fas fa-star scene-active-indicator" title="Active Scene"></i>`);
+        $li.find(".document-name").prepend(icon); // put before the scene name
+      }
     });
   });
 });
