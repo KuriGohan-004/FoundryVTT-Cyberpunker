@@ -16,7 +16,7 @@
   "scripts": [
   "scripts/combathud.js",
   "scripts/autoroller.js",
-  "scripts/combat_ready.js",
+  "scripts/controls_MouseClicks.js",
   "scripts/scene_manager.js",
   "scripts/active-character-hud.js",
   "scripts/combatcarousel.js"],
@@ -25,4 +25,5 @@
   "download": "https://github.com/KuriGohan-004/FoundryVTT-Cyberpunker/archive/refs/heads/main.zip",
   "license": ""
 }
+
 
