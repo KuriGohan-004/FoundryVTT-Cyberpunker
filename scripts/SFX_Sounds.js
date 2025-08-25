@@ -1,15 +1,15 @@
 /**
- * Cyberpunker Red Weapon Sound System
+ * Cyberpunker Red Weapon Sound System with File Picker
  * Plays a configured sound when a weapon attack is rolled
  */
 
-Hooks.once("init", () => {
+Hooks.once("init", async () => {
     console.log("Cyberpunker Red Weapon Sounds | Initializing");
 
-    // Define weapon types in your system
+    // Define your weapon types
     const weaponTypes = ["melee", "pistol", "rifle", "shotgun", "heavy"];
 
-    // Register a world setting for each weapon type
+    // Register a setting for each weapon type with a FilePicker button
     weaponTypes.forEach(type => {
         game.settings.register("cyberpunker-red", `sound-${type}`, {
             name: `Sound for ${type} weapons`,
@@ -17,22 +17,28 @@ Hooks.once("init", () => {
             scope: "world",
             config: true,
             type: String,
-            default: "", // Default no sound
+            default: "",
+            filePicker: true, // Enable file picker
+            onChange: value => {
+                console.log(`Cyberpunker Red | ${type} sound set to: ${value}`);
+            }
         });
     });
+
+    // Add a small UI helper for FilePicker buttons
+    ui.notifications.info("Cyberpunker Red Weapon Sounds initialized. Use Settings to select sound files.");
 });
 
 // Hook into item rolls
 Hooks.on("rollItem", async (item, rollData) => {
     try {
-        // Only proceed if this is a weapon
         if (!item || item.type !== "weapon") return;
 
-        // Access the weapon type (adjust property based on your system)
+        // Adjust this property based on your system
         const weaponType = item.system.weaponType;
         if (!weaponType) return;
 
-        // Retrieve GM-configured sound for this weapon type
+        // Get the GM-selected sound path
         const soundPath = game.settings.get("cyberpunker-red", `sound-${weaponType}`);
         if (!soundPath) return;
 
