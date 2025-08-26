@@ -42,35 +42,36 @@
     return !actor?.hasPlayerOwner;
   }
 
-  /** Apply/remove skull overlay and tint based on dead state; optionally remove from combat. */
-  async function applyDeathState(token, isDead) {
-    const doc = token.document;
+ /** Apply/remove skull overlay and tint based on dead state; optionally remove from combat. */
+async function applyDeathState(token, isDead) {
+  const doc = token.document;
 
-    // TINT
-    const currentTint = doc.texture?.tint ?? null;
-    if (isDead && currentTint !== DEAD_TINT) {
-      await doc.update({ "texture.tint": DEAD_TINT });
-    } else if (!isDead && currentTint) {
-      await doc.update({ "texture.tint": null });
-    }
+  // --- Tint ---
+  const currentTint = doc.texture?.tint ?? null;
+  if (isDead && currentTint !== DEAD_TINT) {
+    await doc.update({ "texture.tint": DEAD_TINT });
+  } else if (!isDead && currentTint) {
+    await doc.update({ "texture.tint": null });
+  }
 
-    // SKULL OVERLAY
-    const currentOverlay = doc.overlayEffect ?? null;
-    if (isDead && currentOverlay !== SKULL_ICON) {
-      await doc.update({ overlayEffect: SKULL_ICON });
-    } else if (!isDead && currentOverlay) {
-      await doc.update({ overlayEffect: null });
-    }
+  // --- Skull overlay ---
+  const currentOverlay = doc.overlayEffect ?? null;
+  if (isDead && currentOverlay !== SKULL_ICON) {
+    await doc.update({ overlayEffect: SKULL_ICON });
+  } else if (!isDead && currentOverlay === SKULL_ICON) {
+    await doc.update({ overlayEffect: null });
+  }
 
-    // REMOVE FROM COMBAT (only when dead, unowned by players, and the active combat includes this token)
-    if (isDead && isUnownedByPlayers(token.actor) && game.combat?.active && token.combatant) {
-      try {
-        await token.combatant.delete();
-      } catch (e) {
-        console.warn(`${MODULE_ID} | Failed to remove combatant for token ${token.id}:`, e);
-      }
+  // --- Remove from combat if dead + unowned ---
+  if (isDead && isUnownedByPlayers(token.actor) && game.combat?.active && token.combatant) {
+    try {
+      await token.combatant.delete();
+    } catch (e) {
+      console.warn(`${MODULE_ID} | Failed to remove combatant for token ${token.id}:`, e);
     }
   }
+}
+
 
   /** Check a single token against its Bar 1 value and update visuals/combat if needed. */
   async function evaluateTokenByBar1(token) {
