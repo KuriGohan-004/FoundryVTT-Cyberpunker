@@ -129,40 +129,38 @@
     if (token) await evaluateTokenByBar1(token);
   });
 
-  // --- Auto-select token on turn start ---
-  const TURN_SETTING = "autoSelectTurnToken";
 
-  Hooks.once("init", () => {
-    game.settings.register(MODULE_ID, TURN_SETTING, {
-      name: "Auto-select Token on Turn",
-      hint: "When combat turn changes, if you have permission to control the token, it will automatically be selected.",
-      scope: "client",
-      config: true,
-      type: Boolean,
-      default: true
-    });
-  });
 
-  Hooks.on("combatTurn", (combat, updateData, updateOptions) => {
+    // --- Auto-select token on turn start (improved) ---
+  // NOTE: This assumes you already registered the TURN_SETTING constant earlier in the script.
+  Hooks.on("combatTurn", (combat, updateData) => {
+    // Respect the client setting
     if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
 
-    const combatant = combat.combatant;
+    // Prefer the incoming turn index provided by the hook; fallback to combat.turn
+    const turnIndex = (updateData && typeof updateData.turn === "number") ? updateData.turn : combat.turn;
+    const turnData = combat.turns?.[turnIndex];
+    const combatantId = turnData?.id;
+    if (!combatantId) return;
+
+    const combatant = combat.combatants.get(combatantId);
     if (!combatant) return;
 
-    const token = combatant.token?.object;
+    // Find the token on the current canvas for this combatant
+    const tokenId = combatant.tokenId ?? combatant.token?.id;
+    const token = tokenId ? canvas.tokens.get(tokenId) : (combatant.token?.object ?? null);
     if (!token) return;
 
-    // Check if the user has at least observer permission on this actor
-    const actor = token.actor;
-    if (!actor) return;
+    // Allow selection for GMs (so NPCs get selected) OR for users who have OBSERVER on the actor
+    const actor = combatant.actor;
+    const canSelect = game.user.isGM || (actor && actor.testUserPermission(game.user, "OBSERVER"));
+    if (!canSelect) return;
 
-    if (actor.testUserPermission(game.user, "OBSERVER")) {
-      // Clear previous selection
-      canvas.tokens.releaseAll();
-      // Select this token
-      token.control({ releaseOthers: true });
-    }
+    // Clear other selections and select this token
+    canvas.tokens.releaseAll();
+    token.control({ releaseOthers: true });
   });
+
 
 
   
