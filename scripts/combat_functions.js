@@ -131,13 +131,13 @@
 
 
 
-   // --- Auto-select token when a turn ENDS (previous combatant) ---
+   // --- Auto-select token when a turn BEGINS (current combatant) ---
   const TURN_SETTING = "autoSelectTurnToken";
 
   Hooks.once("init", () => {
     game.settings.register(MODULE_ID, TURN_SETTING, {
-      name: "Auto-select Previous Token on Turn End",
-      hint: "When combat advances, automatically select the token whose turn just ended (if you have permission to control it).",
+      name: "Auto-select Token on Turn Start",
+      hint: "When combat advances, automatically select the token whose turn has just begun (if you have permission to control it).",
       scope: "client",
       config: true,
       type: Boolean,
@@ -145,22 +145,22 @@
     });
   });
 
-  Hooks.on("combatTurn", (combat, updateData, updateOptions) => {
+  Hooks.on("combatTurn", (combat, updateData) => {
     if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
 
-    // The turn that *just ended* is (updateData.turn - 1)
-    let prevIndex = (typeof updateData.turn === "number") ? updateData.turn - 1 : combat.turn - 1;
-    if (prevIndex < 0) prevIndex = combat.turns.length - 1; // wrap to last combatant if needed
+    // The turn that just began is updateData.turn (fall back to combat.turn if missing)
+    let currentIndex = (typeof updateData.turn === "number") ? updateData.turn : combat.turn;
+    if (currentIndex == null) return;
 
-    const prevCombatant = combat.turns?.[prevIndex];
-    if (!prevCombatant) return;
+    const currentCombatant = combat.turns?.[currentIndex];
+    if (!currentCombatant) return;
 
     // Find the token on the canvas
-    const tokenId = prevCombatant.tokenId ?? prevCombatant.token?.id;
-    const token = tokenId ? canvas.tokens.get(tokenId) : prevCombatant.token?.object;
+    const tokenId = currentCombatant.tokenId ?? currentCombatant.token?.id;
+    const token = tokenId ? canvas.tokens.get(tokenId) : currentCombatant.token?.object;
     if (!token) return;
 
-    const actor = prevCombatant.actor;
+    const actor = currentCombatant.actor;
     if (!actor) return;
 
     // Allow if GM, or if player has OBSERVER+ permission
@@ -171,6 +171,7 @@
     canvas.tokens.releaseAll();
     token.control({ releaseOthers: true });
   });
+
 
 
   
