@@ -131,7 +131,7 @@
 
 
 
-   // --- Auto-select token when a turn BEGINS (current combatant) ---
+  // --- Auto-select token when a turn BEGINS (current combatant) ---
   const TURN_SETTING = "autoSelectTurnToken";
 
   Hooks.once("init", () => {
@@ -148,9 +148,9 @@
   Hooks.on("combatTurn", (combat, updateData) => {
     if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
 
-    // The turn that just began is updateData.turn (fall back to combat.turn if missing)
-    let currentIndex = (typeof updateData.turn === "number") ? updateData.turn : combat.turn;
-    if (currentIndex == null) return;
+    // Always use the combat's current turn index after update
+    const currentIndex = combat.turn;
+    if (currentIndex == null || currentIndex < 0) return;
 
     const currentCombatant = combat.turns?.[currentIndex];
     if (!currentCombatant) return;
@@ -171,6 +171,7 @@
     canvas.tokens.releaseAll();
     token.control({ releaseOthers: true });
   });
+
 
 
 
