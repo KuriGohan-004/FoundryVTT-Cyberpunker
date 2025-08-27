@@ -84,7 +84,7 @@ class CyberpunkerRedHUD {
     this.hudElement?.remove();
 
     this.hudElement = $(
-      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 40px; right: 320px; z-index: 110; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
+      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 10px; right: 320px; z-index: 110; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
     ).appendTo(document.body);
 
     const actor = this._getActiveActor();
@@ -95,7 +95,7 @@ class CyberpunkerRedHUD {
 
     // Portrait above macro bar and sheets
     const portrait = $(
-      `<div style="position: relative; display: inline-block; margin-bottom: -10px; z-index: 120;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; z-index: 120;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
     );
 
     portrait.find("img").on("click", () => {
@@ -108,11 +108,11 @@ class CyberpunkerRedHUD {
       actor.sheet?.render(true);
     });
 
-    const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-start; z-index: 100;"></div>`);
+    const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-end; z-index: 100;"></div>`);
 
     // Move squares container
     const moveContainer = $(`<div class="cpr-move-container" style="display: flex; gap: 2px; margin-bottom: 4px;"></div>`);
-    const moveScore = actor.system?.derivedStats?.Move || 0;
+    const moveScore = actor.system?.stats?.move?.value || 0;
     for (let i = 0; i < moveScore; i++) {
       moveContainer.append(`<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px;"></div>`);
     }
@@ -122,7 +122,7 @@ class CyberpunkerRedHUD {
     const pct = this._pct(current, max);
 
     const hpBar = $(
-      `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 10px; z-index: 100;">
+      `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 0px; margin-right: 5px; z-index: 100;">
         <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease;"></div>
         <div class="cpr-hp-current" style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 14px; font-weight: 800; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${Number.isFinite(current) ? current : 0}</div>
         <div class="cpr-hp-name-left" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); padding: 1px 6px; font-size: 12px; font-weight: 700; color: #ffffff; background: rgba(0,0,0,0.6); border-radius: 4px; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${actor.name}</div>
@@ -138,8 +138,10 @@ class CyberpunkerRedHUD {
       $("head").append(`<style id="cpr-pulse-style">@keyframes cpr-pulse-red {0% { background-color: #ff2a2a; } 50% { background-color: #ff0000; } 100% { background-color: #ff2a2a; }}</style>`);
     }
 
-    statHud.append(moveContainer, hpBar);
-    this.hudElement.append(statHud, portrait);
+    const container = $('<div style="display: flex; align-items: flex-end;"></div>');
+    container.append(hpBar, portrait);
+    statHud.append(moveContainer, container);
+    this.hudElement.append(statHud);
   }
 
   static setActiveCharacter(actor) {
@@ -175,7 +177,6 @@ class CyberpunkerRedHUD {
       if (controlled && token.actor?.isOwner) this.setActiveCharacter(token.actor);
     });
 
-    // Reset move squares at start of turn or end of combat
     Hooks.on("updateCombat", (combat, changed, options, userId) => {
       this._resetMoveSquares();
     });
