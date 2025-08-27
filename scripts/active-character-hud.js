@@ -96,7 +96,7 @@ class CyberpunkerRedHUD {
 
     // Portrait above macro bar and sheets, lowered by 5px
     const portrait = $(
-      `<div style="position: relative; display: inline-block; z-index: 120; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
     );
 
     portrait.find("img").on("click", () => {
@@ -129,6 +129,13 @@ class CyberpunkerRedHUD {
     const moveScore = actor.system?.stats?.move?.value || 0;
     for (let i = 0; i < moveScore; i++) {
       moveContainer.append(`<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px;"></div>`);
+    }
+    // Re-apply any previously-used move squares so HUD rebuilds (which happen on token updates)
+    // do not visually reset squares that have already been consumed this turn.
+    const createdSquares = moveContainer.find('.cpr-move-square');
+    for (let i = 0; i < Math.min(this.moveUsed, createdSquares.length); i++) {
+      $(createdSquares[i]).css('background', '#0d2a66');
+      $(createdSquares[i]).attr('data-used', 'true');
     }
 
     const fillEl = hpBar.find(".cpr-hp-fill");
@@ -202,8 +209,9 @@ class CyberpunkerRedHUD {
         // Darken the next available square (one per move) until exhausted
         if (this.moveUsed < squares.length) {
           const el = squares.get(this.moveUsed);
-          if (el && $(el).css('background-color') !== 'rgb(13, 42, 102)') {
+          if (el) {
             $(el).css('background', '#0d2a66');
+            $(el).attr('data-used', 'true');
             this.moveUsed++;
           }
         }
