@@ -131,28 +131,26 @@
 
 
 // Select the new combatanttt rawr! //
-  Hooks.on("combatTurn", async (combat, updateData, options) => {
-  // Get the current combatant after the turn update
-  const currentCombatant = combat.combatant;
 
-  if (!currentCombatant) return;
+  let lastActiveCombatantId = null;
 
-  // Get the token linked to the combatant
-  const token = canvas.tokens.get(currentCombatant.token?.id);
+Hooks.on("updateCombat", async (combat, changed, options, userId) => {
+  // Only proceed if the active combatant changed
+  if (!("turn" in changed || "round" in changed)) return;
 
-  // If you own this token, select it
+  const activeCombatant = combat.combatant;
+  if (!activeCombatant) return;
+
+  // Check if it's a new combatant
+  if (activeCombatant.id === lastActiveCombatantId) return;
+  lastActiveCombatantId = activeCombatant.id;
+
+  // Get the token linked to the active combatant
+  const token = canvas.tokens.get(activeCombatant.token?.id);
   if (token && token.isOwner) {
-    // Deselect any other selected tokens first
-    const currentlySelected = canvas.tokens.controlled;
-    for (let t of currentlySelected) {
-      if (t.id !== token.id) t._controlled = false;
-    }
-
-    // Select the new token
     token.control({ releaseOthers: true });
   }
 });
-
 
 
 
