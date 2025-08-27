@@ -180,8 +180,13 @@ class CyberpunkerRedHUD {
       if (controlled && token.actor?.isOwner) this.setActiveCharacter(token.actor);
     });
 
-    Hooks.on("updateCombat", () => this._resetMoveSquares());
+    Hooks.on("updateCombat", (combat, data, options, userId) => {
+      if (data.turn !== undefined || data.round !== undefined) {
+        this._resetMoveSquares();
+      }
+    });
     Hooks.on("deleteCombat", () => this._resetMoveSquares());
+    Hooks.on("canvasReady", () => this._resetMoveSquares());
 
     // Track token movement during the active combatant's turn and darken move squares sequentially
     Hooks.on("updateToken", (tokenDoc, updates) => {
@@ -197,8 +202,10 @@ class CyberpunkerRedHUD {
         // Darken the next available square (one per move) until exhausted
         if (this.moveUsed < squares.length) {
           const el = squares.get(this.moveUsed);
-          if (el) $(el).css('background', '#0d2a66');
-          this.moveUsed++;
+          if (el && $(el).css('background-color') !== 'rgb(13, 42, 102)') {
+            $(el).css('background', '#0d2a66');
+            this.moveUsed++;
+          }
         }
       }
     });
