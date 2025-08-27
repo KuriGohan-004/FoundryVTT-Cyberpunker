@@ -2,6 +2,7 @@
 class CyberpunkerRedHUD {
   static activeCharacterId = null;
   static hudElement = null;
+  static moveUsed = 0; // <--- track how many move squares have been used this turn
 
   // ---------- Utilities ----------
   static _getActiveActor() {
@@ -182,6 +183,7 @@ class CyberpunkerRedHUD {
     Hooks.on("updateCombat", () => this._resetMoveSquares());
     Hooks.on("deleteCombat", () => this._resetMoveSquares());
 
+    // Track token movement during the active combatant's turn and darken move squares sequentially
     Hooks.on("updateToken", (tokenDoc, updates) => {
       const token = canvas.tokens.get(tokenDoc.id);
       if (!token || !token.actor || token.actor.id !== this.activeCharacterId) return;
@@ -191,14 +193,20 @@ class CyberpunkerRedHUD {
       if (!turn || turn.actor.id !== this.activeCharacterId) return;
       if (updates.x != null || updates.y != null) {
         const squares = this.hudElement?.find('.cpr-move-square');
-        const firstBlue = squares?.filter((i, el) => $(el).css('background-color') === 'rgb(51, 153, 255)');
-        if (firstBlue.length > 0) $(firstBlue[0]).css('background', '#0d2a66');
+        if (!squares || squares.length === 0) return;
+        // Darken the next available square (one per move) until exhausted
+        if (this.moveUsed < squares.length) {
+          const el = squares.get(this.moveUsed);
+          if (el) $(el).css('background', '#0d2a66');
+          this.moveUsed++;
+        }
       }
     });
   }
 
   static _resetMoveSquares() {
     this.hudElement?.find(".cpr-move-square").css("background", "#3399ff");
+    this.moveUsed = 0; // reset the counter when moves/reset events occur
   }
 }
 
