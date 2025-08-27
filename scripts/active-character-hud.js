@@ -122,7 +122,7 @@ class CyberpunkerRedHUD {
     const pct = this._pct(current, max);
 
     const hpBar = $(
-      `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 0px; margin-right: 5px; z-index: 100; bottom: 100px;">
+      `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 0px; margin-right: 5px; z-index: 100; bottom: 65px; pointer-events: none;">
         <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease;"></div>
         <div class="cpr-hp-current" style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 14px; font-weight: 800; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${Number.isFinite(current) ? current : 0}</div>
         <div class="cpr-hp-name-left" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); padding: 1px 6px; font-size: 12px; font-weight: 700; color: #ffffff; background: rgba(0,0,0,0.6); border-radius: 4px; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${actor.name}</div>
@@ -202,6 +202,10 @@ class CyberpunkerRedHUD {
 
   static _resetMoveSquares() {
     this.hudElement?.find(".cpr-move-square").css("background", "#3399ff");
+  }
+
+  static markMoveSquare(stepIndex) {
+    this.hudElement?.find(`.cpr-move-square:eq(${stepIndex})`).css("background", "#0d2a66");
   }
 }
 
