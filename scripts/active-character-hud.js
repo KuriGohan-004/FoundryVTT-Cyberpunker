@@ -84,7 +84,7 @@ class CyberpunkerRedHUD {
     this.hudElement?.remove();
 
     this.hudElement = $(
-      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 10px; right: 320px; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
+      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 15px; right: 320px; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
     ).appendTo(document.body);
 
     const actor = this._getActiveActor();
@@ -124,7 +124,7 @@ class CyberpunkerRedHUD {
     );
 
     // Move squares above HP bar, aligned to right, visible
-    const moveContainer = $(`<div class="cpr-move-container" style="display: flex; gap: 2px; position: absolute; bottom: 70px; right: 0;"></div>`);
+    const moveContainer = $(`<div class="cpr-move-container" style="display: flex; gap: 2px; position: absolute; bottom: 70px; right: -200px;"></div>`);
     const moveScore = actor.system?.stats?.move?.value || 0;
     for (let i = 0; i < moveScore; i++) {
       moveContainer.append(`<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px;"></div>`);
