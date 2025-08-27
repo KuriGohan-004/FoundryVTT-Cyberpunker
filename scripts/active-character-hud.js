@@ -96,7 +96,7 @@ class CyberpunkerRedHUD {
 
     // Portrait above macro bar and sheets, lowered by 5px
     const portrait = $(
-      `<div style="position: relative; display: inline-block; z-index: 200; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
     );
 
     portrait.find("img").on("click", () => {
@@ -109,7 +109,7 @@ class CyberpunkerRedHUD {
       actor.sheet?.render(true);
     });
 
-    const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-end; z-index: 150;"></div>`);
+    const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-end; z-index: 100;"></div>`);
 
     const sourceActor = token?.actor ?? actor;
     const { current, max } = this._resolveHP(sourceActor);
