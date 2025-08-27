@@ -84,17 +84,18 @@ class CyberpunkerRedHUD {
     this.hudElement?.remove();
 
     this.hudElement = $(
-      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 80px; right: 320px; z-index: 110; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
+      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 40px; right: 320px; z-index: 110; display: flex; flex-direction: column-reverse; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
     ).appendTo(document.body);
 
     const actor = this._getActiveActor();
     if (!actor) return;
 
     const token = this._getActiveToken();
-
     const imgSrc = token?.data?.img || actor.img;
+
+    // Portrait above macro bar and sheets
     const portrait = $(
-      `<div style="position: relative; display: inline-block; margin-bottom: -50px; z-index: 111;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; margin-bottom: -10px; z-index: 120;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
     );
 
     portrait.find("img").on("click", () => {
@@ -108,6 +109,13 @@ class CyberpunkerRedHUD {
     });
 
     const statHud = $(`<div style="display: flex; flex-direction: column; align-items: flex-start; z-index: 100;"></div>`);
+
+    // Move squares container
+    const moveContainer = $(`<div class="cpr-move-container" style="display: flex; gap: 2px; margin-bottom: 4px;"></div>`);
+    const moveScore = actor.system?.derivedStats?.Move || 0;
+    for (let i = 0; i < moveScore; i++) {
+      moveContainer.append(`<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px;"></div>`);
+    }
 
     const sourceActor = token?.actor ?? actor;
     const { current, max } = this._resolveHP(sourceActor);
@@ -130,7 +138,7 @@ class CyberpunkerRedHUD {
       $("head").append(`<style id="cpr-pulse-style">@keyframes cpr-pulse-red {0% { background-color: #ff2a2a; } 50% { background-color: #ff0000; } 100% { background-color: #ff2a2a; }}</style>`);
     }
 
-    statHud.append(hpBar);
+    statHud.append(moveContainer, hpBar);
     this.hudElement.append(statHud, portrait);
   }
 
@@ -166,6 +174,22 @@ class CyberpunkerRedHUD {
     Hooks.on("controlToken", (token, controlled) => {
       if (controlled && token.actor?.isOwner) this.setActiveCharacter(token.actor);
     });
+
+    // Reset move squares at start of turn or end of combat
+    Hooks.on("updateCombat", (combat, changed, options, userId) => {
+      this._resetMoveSquares();
+    });
+    Hooks.on("deleteCombat", () => {
+      this._resetMoveSquares();
+    });
+  }
+
+  static _resetMoveSquares() {
+    this.hudElement?.find(".cpr-move-square").css("background", "#3399ff");
+  }
+
+  static markMoveSquare(stepIndex) {
+    this.hudElement?.find(`.cpr-move-square:eq(${stepIndex})`).css("background", "#0d2a66");
   }
 }
 
