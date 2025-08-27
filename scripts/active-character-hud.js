@@ -85,40 +85,19 @@ class CyberpunkerRedHUD {
   static _buildHUD() {
     this.hudElement?.remove();
 
-    this.hudElement = $(`
-      <div id="cyberpunker-red-hud" style="
-        position: absolute;
-        bottom: 50px;          /* HP bar raised */
-        right: 320px;
-        z-index: 100;
-        display: flex;
-        align-items: flex-end;
-        gap: 10px;
-        pointer-events: auto;
-      "></div>
-    `).appendTo(document.body);
+    this.hudElement = $(
+      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 50px; right: 320px; z-index: 5; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
+    ).appendTo(document.body);
 
     const actor = this._getActiveActor();
     if (!actor) return;
 
     const token = this._getActiveToken();
 
-    // Portrait (restored to 160x160px, 10px from bottom)
-    const portrait = $(`
-      <div style="
-        position: relative;
-        display: inline-block;
-        margin-bottom: -50px;       /* Distance from bottom of screen */
-      ">
-        <img src="${actor.img}" style="
-          width: 160px;
-          height: 160px;
-          border-radius: 12px;
-          border: 3px solid #444;
-          cursor: pointer;
-        "/>
-      </div>
-    `);
+    const imgSrc = token?.img || actor.img;
+    const portrait = $(
+      `<div style="position: relative; display: inline-block; margin-bottom: -50px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+    );
 
     portrait.find("img").on("click", () => {
       if (!token) return;
@@ -136,71 +115,21 @@ class CyberpunkerRedHUD {
     const { current, max } = this._resolveHP(sourceActor);
     const pct = this._pct(current, max);
 
-    const hpBar = $(`
-      <div class="cpr-hp-wrap" style="
-        position: relative;
-        width: 330px;            /* 50% wider */
-        height: 28px;
-        background: #1b1b1b;
-        border: 2px solid #000;
-        border-radius: 6px;
-        overflow: hidden;
-        margin-bottom: 10px;
-      ">
-        <div class="cpr-hp-fill" style="
-          width: ${pct}%;
-          height: 100%;
-          background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%);
-          transition: width 0.25s ease;
-        "></div>
+    const hpBar = $(
+      `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 10px; z-index: 0;">
+        <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease;"></div>
+        <div class="cpr-hp-current" style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 14px; font-weight: 800; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${Number.isFinite(current) ? current : 0}</div>
+        <div class="cpr-hp-name-left" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); padding: 1px 6px; font-size: 12px; font-weight: 700; color: #ffffff; background: rgba(0,0,0,0.6); border-radius: 4px; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${actor.name}</div>
+      </div>`
+    );
 
-        <div class="cpr-hp-current" style="
-          position: absolute;
-          top: 50%;
-          right: 8px;
-          transform: translateY(-50%);
-          font-size: 14px;
-          font-weight: 800;
-          color: #ffffff;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-          pointer-events: none;
-        ">${Number.isFinite(current) ? current : 0}</div>
-
-        <!-- Character name (left side) -->
-        <div class="cpr-hp-name-left" style="
-          position: absolute;
-          left: 6px;
-          top: 50%;
-          transform: translateY(-50%);
-          padding: 1px 6px;
-          font-size: 12px;
-          font-weight: 700;
-          color: #ffffff;
-          background: rgba(0,0,0,0.6);
-          border-radius: 4px;
-          white-space: nowrap;
-          pointer-events: none;
-          text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-        ">${actor.name}</div>
-      </div>
-    `);
-
-    // Pulsing red effect for low HP (<25%)
     const fillEl = hpBar.find(".cpr-hp-fill");
     if (pct < 25) {
       fillEl.css("animation", "cpr-pulse-red 1s infinite alternate");
     }
 
     if (!$("style#cpr-pulse-style").length) {
-      $("head").append(`
-        <style id="cpr-pulse-style">
-          @keyframes cpr-pulse-red {
-            0% { background-color: #ff2a2a; }
-            50% { background-color: #ff0000; }
-            100% { background-color: #ff2a2a; }
-          }
-        </style>
-      `);
+      $("head").append(`<style id="cpr-pulse-style">@keyframes cpr-pulse-red {0% { background-color: #ff2a2a; } 50% { background-color: #ff0000; } 100% { background-color: #ff2a2a; }}</style>`);
     }
 
     statHud.append(hpBar);
@@ -242,23 +171,9 @@ class CyberpunkerRedHUD {
   }
 }
 
-// ---------- Hooks ----------
 Hooks.once("init", () => {
-  game.settings.register("cyberpunker-red", "lastActive", {
-    scope: "client",
-    config: false,
-    type: String,
-    default: ""
-  });
-
-  game.settings.register("cyberpunker-red", "hpAttribute", {
-    name: "HP Attribute Path",
-    hint: "Data path for HP (default: system.derivedStats.HP). Examples: system.attributes.hp, system.health, etc.",
-    scope: "world",
-    config: true,
-    type: String,
-    default: "system.derivedStats.HP"
-  });
+  game.settings.register("cyberpunker-red", "lastActive", { scope: "client", config: false, type: String, default: "" });
+  game.settings.register("cyberpunker-red", "hpAttribute", { name: "HP Attribute Path", hint: "Data path for HP (default: system.derivedStats.HP). Examples: system.attributes.hp, system.health, etc.", scope: "world", config: true, type: String, default: "system.derivedStats.HP" });
 });
 
 Hooks.once("ready", async () => {
@@ -267,6 +182,8 @@ Hooks.once("ready", async () => {
   if (!CyberpunkerRedHUD.hudElement) CyberpunkerRedHUD._buildHUD();
 
   window.addEventListener("keydown", (ev) => {
+    if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'TEXTAREA') return;
+
     const actor = CyberpunkerRedHUD._getActiveActor();
     if (!actor) return;
 
