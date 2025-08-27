@@ -148,8 +148,8 @@
   Hooks.on("combatTurn", (combat, updateData) => {
     if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
 
-    // Always use the combat's current turn index after update
-    const currentIndex = combat.turn;
+    // Use the incoming turn from updateData.turn, fallback to combat.turn
+    let currentIndex = (typeof updateData.turn === "number") ? updateData.turn : combat.turn;
     if (currentIndex == null || currentIndex < 0) return;
 
     const currentCombatant = combat.turns?.[currentIndex];
@@ -163,14 +163,15 @@
     const actor = currentCombatant.actor;
     if (!actor) return;
 
-    // Allow if GM, or if player has OBSERVER+ permission
+    // Allow selection if GM, or if player has OBSERVER+ permission
     const canSelect = game.user.isGM || actor.testUserPermission(game.user, "OBSERVER");
     if (!canSelect) return;
 
-    // Clear old selection and select this one
+    // Clear old selection and select this token
     canvas.tokens.releaseAll();
     token.control({ releaseOthers: true });
   });
+
 
 
 
