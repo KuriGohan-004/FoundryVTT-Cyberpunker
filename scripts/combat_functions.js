@@ -130,47 +130,29 @@
   });
 
 
+// Select the new combatanttt rawr! //
+  Hooks.on("combatTurn", async (combat, updateData, options) => {
+  // Get the current combatant after the turn update
+  const currentCombatant = combat.combatant;
 
-  // --- Auto-select token when a turn BEGINS (current combatant) ---
-  const TURN_SETTING = "autoSelectTurnToken";
+  if (!currentCombatant) return;
 
-  Hooks.once("init", () => {
-    game.settings.register(MODULE_ID, TURN_SETTING, {
-      name: "Auto-select Token on Turn Start",
-      hint: "When combat advances, automatically select the token whose turn has just begun (if you have permission to control it).",
-      scope: "client",
-      config: true,
-      type: Boolean,
-      default: true
-    });
-  });
+  // Get the token linked to the combatant
+  const token = canvas.tokens.get(currentCombatant.token?.id);
 
-  Hooks.on("combatTurn", (combat, updateData) => {
-    if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
+  // If you own this token, select it
+  if (token && token.isOwner) {
+    // Deselect any other selected tokens first
+    const currentlySelected = canvas.tokens.controlled;
+    for (let t of currentlySelected) {
+      if (t.id !== token.id) t._controlled = false;
+    }
 
-    // Use the incoming turn from updateData.turn, fallback to combat.turn
-    let currentIndex = (typeof updateData.turn === "number") ? updateData.turn : combat.turn;
-    if (currentIndex == null || currentIndex < 0) return;
-
-    const currentCombatant = combat.turns?.[currentIndex];
-    if (!currentCombatant) return;
-
-    // Find the token on the canvas
-    const tokenId = currentCombatant.tokenId ?? currentCombatant.token?.id;
-    const token = tokenId ? canvas.tokens.get(tokenId) : currentCombatant.token?.object;
-    if (!token) return;
-
-    const actor = currentCombatant.actor;
-    if (!actor) return;
-
-    // Allow selection if GM, or if player has OBSERVER+ permission
-    const canSelect = game.user.isGM || actor.testUserPermission(game.user, "OBSERVER");
-    if (!canSelect) return;
-
-    // Clear old selection and select this token
-    canvas.tokens.releaseAll();
+    // Select the new token
     token.control({ releaseOthers: true });
-  });
+  }
+});
+
 
 
 
