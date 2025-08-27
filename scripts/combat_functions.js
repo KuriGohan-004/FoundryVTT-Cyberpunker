@@ -131,36 +131,46 @@
 
 
 
-    // --- Auto-select token on turn start (improved) ---
-  // NOTE: This assumes you already registered the TURN_SETTING constant earlier in the script.
-  Hooks.on("combatTurn", (combat, updateData) => {
-    // Respect the client setting
+   // --- Auto-select token when a turn ENDS (previous combatant) ---
+  const TURN_SETTING = "autoSelectTurnToken";
+
+  Hooks.once("init", () => {
+    game.settings.register(MODULE_ID, TURN_SETTING, {
+      name: "Auto-select Previous Token on Turn End",
+      hint: "When combat advances, automatically select the token whose turn just ended (if you have permission to control it).",
+      scope: "client",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+  });
+
+  Hooks.on("combatTurn", (combat, updateData, updateOptions) => {
     if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
 
-    // Prefer the incoming turn index provided by the hook; fallback to combat.turn
-    const turnIndex = (updateData && typeof updateData.turn === "number") ? updateData.turn : combat.turn;
-    const turnData = combat.turns?.[turnIndex];
-    const combatantId = turnData?.id;
-    if (!combatantId) return;
+    // The turn that *just ended* is (updateData.turn - 1)
+    let prevIndex = (typeof updateData.turn === "number") ? updateData.turn - 1 : combat.turn - 1;
+    if (prevIndex < 0) prevIndex = combat.turns.length - 1; // wrap to last combatant if needed
 
-    const combatant = combat.combatants.get(combatantId);
-    if (!combatant) return;
+    const prevCombatant = combat.turns?.[prevIndex];
+    if (!prevCombatant) return;
 
-    // Find the token on the current canvas for this combatant
-    const tokenId = combatant.tokenId ?? combatant.token?.id;
-    const token = tokenId ? canvas.tokens.get(tokenId) : (combatant.token?.object ?? null);
+    // Find the token on the canvas
+    const tokenId = prevCombatant.tokenId ?? prevCombatant.token?.id;
+    const token = tokenId ? canvas.tokens.get(tokenId) : prevCombatant.token?.object;
     if (!token) return;
 
-    // Allow selection for GMs (so NPCs get selected) OR for users who have OBSERVER on the actor
-    const actor = combatant.actor;
-    const canSelect = game.user.isGM || (actor && actor.testUserPermission(game.user, "OBSERVER"));
+    const actor = prevCombatant.actor;
+    if (!actor) return;
+
+    // Allow if GM, or if player has OBSERVER+ permission
+    const canSelect = game.user.isGM || actor.testUserPermission(game.user, "OBSERVER");
     if (!canSelect) return;
 
-    // Clear other selections and select this token
+    // Clear old selection and select this one
     canvas.tokens.releaseAll();
     token.control({ releaseOthers: true });
   });
-
 
 
   
