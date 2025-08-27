@@ -128,4 +128,42 @@
     const token = tokenDoc.object;
     if (token) await evaluateTokenByBar1(token);
   });
+
+  // --- Auto-select token on turn start ---
+  const TURN_SETTING = "autoSelectTurnToken";
+
+  Hooks.once("init", () => {
+    game.settings.register(MODULE_ID, TURN_SETTING, {
+      name: "Auto-select Token on Turn",
+      hint: "When combat turn changes, if you have permission to control the token, it will automatically be selected.",
+      scope: "client",
+      config: true,
+      type: Boolean,
+      default: true
+    });
+  });
+
+  Hooks.on("combatTurn", (combat, updateData, updateOptions) => {
+    if (!game.settings.get(MODULE_ID, TURN_SETTING)) return;
+
+    const combatant = combat.combatant;
+    if (!combatant) return;
+
+    const token = combatant.token?.object;
+    if (!token) return;
+
+    // Check if the user has at least observer permission on this actor
+    const actor = token.actor;
+    if (!actor) return;
+
+    if (actor.testUserPermission(game.user, "OBSERVER")) {
+      // Clear previous selection
+      canvas.tokens.releaseAll();
+      // Select this token
+      token.control({ releaseOthers: true });
+    }
+  });
+
+
+  
 })();
