@@ -95,7 +95,7 @@ class CyberpunkerRedHUD {
 
     // Portrait above macro bar and sheets, lowered by 5px
     const portrait = $(
-      `<div style="position: relative; display: inline-block; z-index: 75; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; z-index: 120; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
     );
 
     portrait.find("img").on("click", () => {
