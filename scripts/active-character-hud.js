@@ -272,8 +272,7 @@ Hooks.once("ready", async () => {
   });
 });
 
-
-// --- Addendum: Reflex Icon (click to roll Evasion) ---
+// --- Addendum: Reflex Icon (always visible, clickable only if Reflex >= 8) ---
 Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   const actor = CyberpunkerRedHUD._getActiveActor();
   if (!actor) return;
@@ -283,43 +282,62 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   // Remove any existing reflex icon
   $("#cpr-reflex-icon").remove();
 
-  // Only add if Reflex >= 8
-  if (reflex >= 8) {
-    // Find the move container's screen position
-    const moveContainer = hud.find(".cpr-move-container");
-    if (!moveContainer.length) return;
+  // Find the move container's screen position
+  const moveContainer = hud.find(".cpr-move-container");
+  if (!moveContainer.length) return;
 
-    const offset = moveContainer.offset(); // { top, left }
-    const width = moveContainer.outerWidth();
+  const offset = moveContainer.offset(); // { top, left }
+  const width = moveContainer.outerWidth();
 
-    // Create an absolute positioned icon placed to the right of the move boxes
-    const reflexIcon = $(`
-      <div id="cpr-reflex-icon"
-        role="button"
-        title="Roll Evasion"
-        style="
-          position: absolute;
-          top: ${offset.top - 25}px;
-          left: ${offset.left + width + 3}px;
-          width: 30px;
-          height: 30px;
-          background: url('icons/svg/lightning.svg') center/contain no-repeat;
-          z-index: 30;
-          cursor: pointer;
-          filter: drop-shadow(0 0 3px #0ff);
-        ">
-      </div>
+  // Build base icon
+  const reflexIcon = $(`
+    <div id="cpr-reflex-icon"
+      role="button"
+      title="Roll Evasion"
+      style="
+        position: absolute;
+        top: ${offset.top - 20}px;
+        left: ${offset.left + width + 3}px;
+        width: 30px;
+        height: 30px;
+        background: url('icons/svg/lightning.svg') center/contain no-repeat;
+        z-index: 30;
+        cursor: ${reflex >= 8 ? "pointer" : "not-allowed"};
+        filter: ${reflex >= 8 
+          ? "drop-shadow(0 0 3px #0ff)" 
+          : "grayscale(100%) opacity(0.5) drop-shadow(0 0 2px #444)"};
+      ">
+    </div>
+  `);
+
+  // If Reflex < 8, overlay a cross-out visual
+  if (reflex < 8) {
+    reflexIcon.append(`
+      <div style="
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: repeating-linear-gradient(
+          45deg,
+          rgba(255,0,0,0.7),
+          rgba(255,0,0,0.7) 2px,
+          transparent 2px,
+          transparent 6px
+        );
+        pointer-events: none;
+      "></div>
     `);
+  }
 
-    // Append to body so it is independent of HUD layout
-    $("body").append(reflexIcon);
+  // Append to body so it is independent of HUD layout
+  $("body").append(reflexIcon);
 
-    // Bind click -> roll Evasion using your provided macro
+  // Bind click only if Reflex >= 8
+  if (reflex >= 8) {
     reflexIcon.on("click", (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
 
-      // Use the macro you shared. Adjust skipPrompt if you want true/false by default.
       const skipPrompt = false;
       if (game.cpr?.macro?.rollItemMacro && typeof game.cpr.macro.rollItemMacro === "function") {
         try {
@@ -334,5 +352,6 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     });
   }
 });
+
 
 
