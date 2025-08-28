@@ -297,7 +297,7 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
       <div id="cpr-reflex-icon"
         style="
           position: absolute;
-          top: ${offset.top + 3}px;
+          top: ${offset.top + 13}px;
           left: ${offset.left + width + 8}px; /* 8px padding to the right */
           width: 30px;
           height: 30px;
