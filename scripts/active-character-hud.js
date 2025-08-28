@@ -375,3 +375,16 @@ Hooks.on("canvasReady", () => {
     canvas.animatePan({ x: activeToken.x, y: activeToken.y, scale: canvas.stage.scale.x });
   });
 });
+
+
+Hooks.once("ready", () => {
+  // Patch Hotbar to only display 7 slots
+  const oldGetMacros = Hotbar.prototype._getMacros;
+  Hotbar.prototype._getMacros = function(page) {
+    let macros = oldGetMacros.call(this, page);
+    return macros.slice(0, 7); // keep only 7 slots
+  };
+
+  // Re-render so the change applies immediately
+  ui.hotbar.render();
+});
