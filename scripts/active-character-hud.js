@@ -92,7 +92,7 @@ class CyberpunkerRedHUD {
     if (!actor) return;
 
     const token = this._getActiveToken();
-    const imgSrc = token?.data?.img || actor.img;
+    const imgSrc = token?.document?.texture?.src || token?.data?.img || actor.img;
 
     const portrait = $(
       `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px; pointer-events: auto;">
@@ -160,9 +160,9 @@ class CyberpunkerRedHUD {
   static setActiveCharacter(actor) {
     if (!actor) return;
 
-    // 🔒 Restrict: Players/Trusted can only control Owned tokens
+    // Restriction: Players/Trusted follow Selected Character only
     if (!game.user.isGM) {
-      if (!actor.isOwner) return;
+      if (actor.id !== game.user.character?.id) return;
     }
 
     this.activeCharacterId = actor.id;
@@ -171,11 +171,17 @@ class CyberpunkerRedHUD {
   }
 
   static async restoreLastActive() {
-    const lastId = game.settings.get("cyberpunker-red", "lastActive");
-    let actor = game.actors.get(lastId);
-    if (!actor || (!game.user.isGM && !actor.isOwner)) {
-      const tok = canvas.tokens.placeables.find(t => t.actor?.isOwner);
-      actor = tok?.actor || game.actors.find(a => a.isOwner);
+    let actor;
+    if (!game.user.isGM) {
+      // For players → force Selected Character
+      actor = game.user.character;
+    } else {
+      const lastId = game.settings.get("cyberpunker-red", "lastActive");
+      actor = game.actors.get(lastId);
+      if (!actor) {
+        const tok = canvas.tokens.placeables.find(t => t.actor?.isOwner);
+        actor = tok?.actor || game.actors.find(a => a.isOwner);
+      }
     }
     if (actor) this.setActiveCharacter(actor);
   }
@@ -193,16 +199,23 @@ class CyberpunkerRedHUD {
     Hooks.on("deleteToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._resetMoveSquares(); });
     Hooks.on("createToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
 
+    // Restrict controlToken → only GMs can switch this way
     Hooks.on("controlToken", (token, controlled) => {
-      if (controlled) {
-        if (game.user.isGM || token.actor?.isOwner) {
-          this.setActiveCharacter(token.actor);
-        }
+      if (game.user.isGM && controlled) {
+        this.setActiveCharacter(token.actor);
       }
     });
 
-    Hooks.on("updateScene", () => this._buildHUD()); // 🔄 refresh on scene update
-    Hooks.on("canvasReady", () => this._buildHUD()); // 🔄 rebuild HUD on canvas ready
+    // 🔄 Refresh on scene change
+    Hooks.on("updateScene", () => this._buildHUD());
+    Hooks.on("canvasReady", () => this._buildHUD());
+
+    // 🔄 Refresh when user's Selected Character changes
+    Hooks.on("updateUser", (user, data) => {
+      if (user.id === game.user.id && data.character !== undefined) {
+        this.restoreLastActive();
+      }
+    });
 
     Hooks.on("updateCombat", (combat, data, options, userId) => {
       if (data.turn !== undefined || data.round !== undefined) {
