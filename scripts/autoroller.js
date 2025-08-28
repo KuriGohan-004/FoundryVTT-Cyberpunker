@@ -26,8 +26,10 @@ Hooks.on("combatStart", async (combat) => {
   await combat.nextRound();
   console.log("Advanced to next combat round.");
 
-  // Switch to the Chat tab
-  const chatTab = document.querySelector(".chat-tab");
-  if (chatTab) chatTab.click();
+  // Switch GM UI to chat tab
+  if (ui.sidebar?.tabs?.active !== "chat") {
+    ui.sidebar.activateTab("chat");
+  }
+  
 });
 
