@@ -152,7 +152,53 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   }
 });
 
+              //    Target Selector     //
+// cyberpunker-red/scripts/autoSelectTarget.js
+Hooks.on("preCreateChatMessage", async (chatMessage, options, userId) => {
+  // Only proceed if the message has a roll
+  if (!chatMessage.data.flags?.core?.roll) return;
 
+  const user = game.users.get(userId);
+  if (!user) return;
+
+  // Only respond to player rolls
+  if (user.isGM) return;
+
+  // Retrieve the targets from the roll (tokenTargeting)
+  const targets = Array.from(game.user.targets);
+  if (!targets.length) return;
+
+  // Only act if there's exactly one target (you can adjust for multiple targets if needed)
+  if (targets.length === 1) {
+    const targetToken = targets[0];
+
+    // Make GM select this token
+    const gmUsers = game.users.filter(u => u.isGM);
+    gmUsers.forEach(gm => {
+      const gmSocket = game.socket;
+      // Sending a request to the GM to select the target token
+      gmSocket.emit("module.cyberpunker-red.selectTarget", { tokenId: targetToken.id, sceneId: targetToken.scene.id });
+    });
+  }
+});
+
+// Listen for the custom socket event to select the token
+Hooks.once("ready", () => {
+  game.socket.on("module.cyberpunker-red.selectTarget", ({ tokenId, sceneId }) => {
+    const gmUser = game.user;
+    if (!gmUser.isGM) return;
+
+    const scene = game.scenes.get(sceneId);
+    if (!scene) return;
+
+    const token = scene.tokens.get(tokenId);
+    if (!token) return;
+
+    // Select the token for the GM
+    canvas.tokens.releaseAll();
+    token.control({ releaseOthers: true });
+  });
+});
 
 
 
