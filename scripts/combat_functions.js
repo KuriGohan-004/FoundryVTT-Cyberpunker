@@ -153,7 +153,6 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
 });
 
               //    Disable the click-drag     //
-
 // --- Settings for disabling token movement in combat ---
 const DISABLE_MOVEMENT_KEY = "disableTokenMoveInCombat";
 
@@ -173,11 +172,11 @@ function isMovementDisabled() {
   return game.settings.get(MODULE_ID, DISABLE_MOVEMENT_KEY) && game.combat?.active;
 }
 
-// --- Hooks to block token control and drag ---
-Hooks.on("preUpdateToken", (tokenDoc, update, options, userId) => {
+// --- Block token drag & click ---
+Hooks.on("renderTokenHUD", (hud, html, token) => {
   if (!game.user.isGM && isMovementDisabled()) {
-    // Block any change in position (x or y)
-    if ("x" in update || "y" in update) return false;
+    // Remove the control handle
+    html.css("pointer-events", "none");
   }
 });
 
@@ -188,6 +187,14 @@ Hooks.on("controlToken", (token, controlled) => {
     ui.notifications.warn("Token movement is disabled during combat.");
   }
 });
+
+Hooks.on("preUpdateToken", (tokenDoc, update, options, userId) => {
+  if (!game.user.isGM && isMovementDisabled()) {
+    if ("x" in update || "y" in update) return false;
+  }
+});
+
+
 
 
   
