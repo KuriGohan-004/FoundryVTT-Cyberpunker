@@ -297,18 +297,30 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
       <div id="cpr-reflex-icon"
         style="
           position: absolute;
-          top: ${offset.top + 13}px;
-          left: ${offset.left + width + 8}px; /* 8px padding to the right */
+          top: ${offset.top - 30}px;
+          left: ${offset.left + width + 8}px;
           width: 30px;
           height: 30px;
           background: url('icons/svg/lightning.svg') center/contain no-repeat;
           z-index: 30;
-          pointer-events: none;
+          cursor: pointer;
           filter: drop-shadow(0 0 3px #0ff);
         ">
       </div>
     `);
 
+    // Append and bind click to roll Evasion
     $("body").append(reflexIcon);
+
+    reflexIcon.on("click", async () => {
+      // Try to roll Evasion skill directly
+      const skill = foundry.utils.getProperty(actor, "system.skills.evasion");
+      if (skill?.roll) {
+        skill.roll({ event: new Event("click") });
+      } else {
+        ui.notifications.warn("Evasion skill not found on this actor.");
+      }
+    });
   }
 });
+
