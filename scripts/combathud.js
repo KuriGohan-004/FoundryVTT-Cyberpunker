@@ -59,10 +59,14 @@ class TopBar {
 
   render(tokens: Token[]) {
     if (!game.settings.get('cyberpunker-red', 'enableTopBar')) return;
-    if (game.combat?.started) {
+
+    // Only show when no encounter is active or combat hasn’t started
+    const encounter = game.combats.contents.find(c => !c.started);
+    if (!encounter) {
       this.container.style.display = "none";
       return;
     }
+
     this.container.style.display = "flex";
     this.clear();
     tokens.forEach(token => this.addToken(token));
@@ -74,35 +78,35 @@ let topBar: TopBar;
 async function updateEncounter() {
   if (!canvas.scene) return;
 
-  // Ensure an encounter exists
-  let encounter = game.combats.contents.find(c => !c.started) || await Combat.create({ name: "Player Encounter" });
-
-  const playerTokens = canvas.tokens.placeables.filter(t => t.actor?.hasPlayerOwner);
-  const tokenIds: string[] = [];
-
-  for (let token of playerTokens) {
-    // Remove old token from encounter if exists
-    const existing = encounter.combatants.find(c => c.actor?.id === token.actor?.id);
-    if (existing) await encounter.deleteEmbeddedDocuments("Combatant", [existing.id]);
-    // Add new token
-    const newCombatant = { tokenId: token.id, actorId: token.actor?.id };
-    await encounter.createEmbeddedDocuments("Combatant", [newCombatant]);
-    tokenIds.push(token.id);
+  // Find a not-started encounter or create a new one
+  let encounter = game.combats.contents.find(c => !c.started);
+  if (!encounter) {
+    encounter = await Combat.create({ name: "Player Encounter" });
   }
 
-  // Render top bar
+  // Add all player-owned tokens (including offline)
+  const playerTokens = canvas.tokens.placeables.filter(t => t.actor?.hasPlayerOwner);
+  for (let token of playerTokens) {
+    // Remove old combatant if exists
+    const existing = encounter.combatants.find(c => c.actor?.id === token.actor?.id);
+    if (existing) await encounter.deleteEmbeddedDocuments("Combatant", [existing.id]);
+
+    await encounter.createEmbeddedDocuments("Combatant", [{ tokenId: token.id, actorId: token.actor?.id }]);
+  }
+
+  // Render the top bar with player tokens
   topBar?.render(playerTokens);
 }
 
-// Hooks to update top bar and encounter
+// Initialize the top bar when ready
 Hooks.once('ready', () => {
   topBar = new TopBar();
   updateEncounter();
 });
 
+// Update encounter and top bar on scene activation and token changes
+Hooks.on('canvasReady', () => updateEncounter());
 Hooks.on('createToken', () => updateEncounter());
 Hooks.on('deleteToken', () => updateEncounter());
-Hooks.on('updateCombat', () => topBar?.render(canvas.tokens.placeables.filter(t => t.actor?.hasPlayerOwner)));
-Hooks.on('deleteCombat', () => updateEncounter());
 Hooks.on('updateScene', () => updateEncounter());
-Hooks.on('canvasReady', () => updateEncounter());
+Hooks.on('deleteCombat', () => updateEncounter());
