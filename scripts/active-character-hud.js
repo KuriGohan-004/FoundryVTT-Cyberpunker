@@ -84,8 +84,9 @@ class CyberpunkerRedHUD {
   static _buildHUD() {
     this.hudElement?.remove();
 
+    // CLICK-THROUGH: make the whole HUD ignore clicks by default.
     this.hudElement = $(
-      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 15px; right: 320px; display: flex; align-items: flex-end; gap: 10px; pointer-events: auto;"></div>`
+      `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 15px; right: 320px; display: flex; align-items: flex-end; gap: 10px; pointer-events: none;"></div>`
     ).appendTo(document.body);
 
     const actor = this._getActiveActor();
@@ -95,8 +96,11 @@ class CyberpunkerRedHUD {
     const imgSrc = token?.data?.img || actor.img;
 
     // Portrait above macro bar and sheets, lowered by 5px
+    // CLICK-THROUGH EXCEPTION: portrait remains interactive.
     const portrait = $(
-      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px;"><img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer;"/></div>`
+      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px; pointer-events: auto;">
+        <img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer; pointer-events: auto;"/>
+      </div>`
     );
 
     portrait.find("img").on("click", () => {
@@ -118,17 +122,21 @@ class CyberpunkerRedHUD {
     // HP Bar below everything else, click-through, raised 10px
     const hpBar = $(
       `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 0px; margin-right: 5px; z-index: 20; bottom: 40px; pointer-events: none;">
-        <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease;"></div>
+        <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease; pointer-events: none;"></div>
         <div class="cpr-hp-current" style="position: absolute; top: 50%; right: 8px; transform: translateY(-50%); font-size: 14px; font-weight: 800; color: #ffffff; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); pointer-events: none;">${Number.isFinite(current) ? current : 0}</div>
         <div class="cpr-hp-name-left" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); padding: 1px 6px; font-size: 12px; font-weight: 700; color: #ffffff; background: rgba(0,0,0,0.6); border-radius: 4px; white-space: nowrap; pointer-events: none; text-shadow: 1px 1px 2px rgba(0,0,0,0.8);">${actor.name}</div>
       </div>`
     );
 
-    // Move squares above HP bar, aligned to right, visible
-    const moveContainer = $(`<div class="cpr-move-container" style="display: flex; gap: 2px; position: absolute; bottom: 70px; right: 200px;"></div>`);
+    // Move squares above HP bar, aligned to right, now click-through
+    const moveContainer = $(
+      `<div class="cpr-move-container" style="display: flex; gap: 2px; position: absolute; bottom: 70px; right: 200px; pointer-events: none;"></div>`
+    );
     const moveScore = actor.system?.stats?.move?.value || 0;
     for (let i = 0; i < moveScore; i++) {
-      moveContainer.append(`<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px;"></div>`);
+      moveContainer.append(
+        `<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px; pointer-events: none;"></div>`
+      );
     }
     // Re-apply any previously-used move squares so HUD rebuilds (which happen on token updates)
     // do not visually reset squares that have already been consumed this turn.
