@@ -92,3 +92,28 @@ Hooks.on("createCombat", (combat, options, userId) => {
     console.log("Switched GM UI to Combat tab.");
   }
 });
+
+// ----------------------
+// Combat End Enhancements
+// ----------------------
+Hooks.once("init", () => {
+  // Setting for custom combat end sound
+  game.settings.register(MODULE_ID, "combatEndSound", {
+    name: "Combat End Sound",
+    hint: "Select a sound file to play when combat ends.",
+    scope: "world",
+    config: true,
+    default: "",
+    type: String,
+    filePicker: "audio"
+  });
+});
+
+Hooks.on("combatEnd", (combat) => {
+  // Play custom sound
+  const soundPath = game.settings.get(MODULE_ID, "combatEndSound");
+  if (soundPath) {
+    AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
+    console.log("Played combat end sound.");
+  }
+});
