@@ -281,18 +281,29 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   // Try to resolve Reflex value (adjust path if needed)
   const reflex = foundry.utils.getProperty(actor, "system.stats.ref.value") ?? 0;
 
-  // Find the move container in the HUD
-  const moveContainer = hud.find(".cpr-move-container");
-  if (!moveContainer.length) return;
+  // Remove any existing reflex icon
+  $("#cpr-reflex-icon").remove();
 
-  // Remove old icon if it exists
-  moveContainer.siblings(".cpr-reflex-icon").remove();
-
-  // If Reflex >= 8, add the icon
+  // If Reflex >= 8, create an absolute-positioned icon overlay
   if (reflex >= 8) {
-    const reflexIcon = $(
-      `<div class="cpr-reflex-icon" style="margin-left: 6px; width: 20px; height: 20px; background: url('icons/svg/lightning.svg') center/contain no-repeat; filter: drop-shadow(0 0 3px #0ff); pointer-events: none;"></div>`
-    );
-    moveContainer.after(reflexIcon);
+    const reflexIcon = $(`
+      <div id="cpr-reflex-icon"
+        style="
+          position: absolute;
+          bottom: 100px;   /* adjust vertical position as needed */
+          right: 170px;    /* adjust horizontal position as needed */
+          width: 24px;
+          height: 24px;
+          background: url('icons/svg/lightning.svg') center/contain no-repeat;
+          z-index: 30;
+          pointer-events: none;
+          filter: drop-shadow(0 0 3px #0ff);
+        ">
+      </div>
+    `);
+
+    // Append directly to body so it's independent of HUD layout
+    $("body").append(reflexIcon);
   }
 });
+
