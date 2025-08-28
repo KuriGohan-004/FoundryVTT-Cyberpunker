@@ -152,23 +152,29 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   }
 });
 
-
-        // Combat Begins- Ready Set Go //
-  // --- Auto-skip to next round and switch to chat on combat start ---
+// --- Auto-roll initiative, skip to next round, and switch to chat on combat start ---
 Hooks.on("createCombat", async (combat) => {
   if (!game.user.isGM) return; // Only GM executes
 
-  // Wait for combat to fully initialize
-  await combat.update({ turn: 0, round: 0 });
+  // --- Roll initiative for all combatants without one ---
+  for (const c of combat.combatants) {
+    if (c.initiative == null) {
+      await c.rollInitiative({ createCombatants: false });
+    }
+  }
 
-  // Advance to the first turn of the next round
-  await combat.nextTurn();
-  await combat.nextRound();
+  // --- Advance to the first turn of the next round ---
+  if (combat.combatants.size > 0) {
+    await combat.update({ turn: 0, round: 0 });
+    await combat.nextTurn();
+    await combat.nextRound();
+  }
 
-  // Switch GM UI to chat tab
+  // --- Switch GM UI to chat tab ---
   if (ui.sidebar?.tabs?.active !== "chat") {
     ui.sidebar.activateTab("chat");
   }
 });
+
 
 })();
