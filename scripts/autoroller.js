@@ -21,4 +21,13 @@ Hooks.on("combatStart", async (combat) => {
 
   await combat.rollInitiative(unrolled.map(c => c.id));
   console.log(`Rolled initiative for ${unrolled.length} combatants.`);
+
+  // Start the next combat round
+  await combat.nextRound();
+  console.log("Advanced to next combat round.");
+
+  // Switch to the Chat tab
+  const chatTab = document.querySelector(".chat-tab");
+  if (chatTab) chatTab.click();
 });
+
