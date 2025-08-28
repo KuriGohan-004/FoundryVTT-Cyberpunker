@@ -272,7 +272,9 @@ Hooks.once("ready", async () => {
   });
 });
 
-// --- Addendum: Reflex Icon (always visible, clickable only if Reflex >= 8) ---
+
+
+// --- Addendum: Reflex Icon (always visible, always clickable) ---
 Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   const actor = CyberpunkerRedHUD._getActiveActor();
   if (!actor) return;
@@ -289,7 +291,7 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   const offset = moveContainer.offset(); // { top, left }
   const width = moveContainer.outerWidth();
 
-  // Build base icon
+  // Build the icon
   const reflexIcon = $(`
     <div id="cpr-reflex-icon"
       role="button"
@@ -302,7 +304,7 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
         height: 30px;
         background: url('icons/svg/lightning.svg') center/contain no-repeat;
         z-index: 30;
-        cursor: ${reflex >= 8 ? "pointer" : "not-allowed"};
+        cursor: pointer;
         filter: ${reflex >= 8 
           ? "drop-shadow(0 0 3px #0ff)" 
           : "grayscale(100%) opacity(0.5) drop-shadow(0 0 2px #444)"};
@@ -310,48 +312,28 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     </div>
   `);
 
-  // If Reflex < 8, overlay a cross-out visual
-  if (reflex < 8) {
-    reflexIcon.append(`
-      <div style="
-        position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
-        background: repeating-linear-gradient(
-          45deg,
-          rgba(255,0,0,0.7),
-          rgba(255,0,0,0.7) 2px,
-          transparent 2px,
-          transparent 6px
-        );
-        pointer-events: none;
-      "></div>
-    `);
-  }
-
   // Append to body so it is independent of HUD layout
   $("body").append(reflexIcon);
 
-  // Bind click only if Reflex >= 8
-  if (reflex >= 8) {
-    reflexIcon.on("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
+  // Always bind click -> roll Evasion
+  reflexIcon.on("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
 
-      const skipPrompt = false;
-      if (game.cpr?.macro?.rollItemMacro && typeof game.cpr.macro.rollItemMacro === "function") {
-        try {
-          game.cpr.macro.rollItemMacro("Evasion", { skipPrompt });
-        } catch (err) {
-          console.error("Error calling rollItemMacro('Evasion'):", err);
-          ui.notifications?.error("Failed to roll Evasion (see console).");
-        }
-      } else {
-        ui.notifications?.warn("Evasion macro function not found (game.cpr.macro.rollItemMacro).");
+    const skipPrompt = false;
+    if (game.cpr?.macro?.rollItemMacro && typeof game.cpr.macro.rollItemMacro === "function") {
+      try {
+        game.cpr.macro.rollItemMacro("Evasion", { skipPrompt });
+      } catch (err) {
+        console.error("Error calling rollItemMacro('Evasion'):", err);
+        ui.notifications?.error("Failed to roll Evasion (see console).");
       }
-    });
-  }
+    } else {
+      ui.notifications?.warn("Evasion macro function not found (game.cpr.macro.rollItemMacro).");
+    }
+  });
 });
+
 
 
 
