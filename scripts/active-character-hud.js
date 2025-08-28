@@ -268,3 +268,28 @@ Hooks.once("ready", async () => {
     }
   });
 });
+
+
+// --- Addendum: Reflex Icon ---
+Hooks.on("renderCyberpunkerRedHUD", (hud) => {
+  const actor = CyberpunkerRedHUD._getActiveActor();
+  if (!actor) return;
+
+  // Try to resolve Reflex value (adjust path if needed)
+  const reflex = foundry.utils.getProperty(actor, "system.stats.ref.value") ?? 0;
+
+  // Find the move container in the HUD
+  const moveContainer = hud.find(".cpr-move-container");
+  if (!moveContainer.length) return;
+
+  // Remove old icon if it exists
+  moveContainer.siblings(".cpr-reflex-icon").remove();
+
+  // If Reflex >= 8, add the icon
+  if (reflex >= 8) {
+    const reflexIcon = $(
+      `<div class="cpr-reflex-icon" style="margin-left: 6px; width: 20px; height: 20px; background: url('icons/svg/lightning.svg') center/contain no-repeat; filter: drop-shadow(0 0 3px #0ff); pointer-events: none;"></div>`
+    );
+    moveContainer.after(reflexIcon);
+  }
+});
