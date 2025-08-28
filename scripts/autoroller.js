@@ -94,7 +94,7 @@ Hooks.on("createCombat", (combat, options, userId) => {
 });
 
 // ----------------------
-// Combat End Enhancements
+// Combat End Sound
 // ----------------------
 Hooks.once("init", () => {
   // Setting for custom combat end sound
@@ -109,11 +109,15 @@ Hooks.once("init", () => {
   });
 });
 
-Hooks.on("combatEnd", (combat) => {
-  // Play custom sound
-  const soundPath = game.settings.get(MODULE_ID, "combatEndSound");
-  if (soundPath) {
-    AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
-    console.log("Played combat end sound.");
+// Detect combat ending and play sound
+Hooks.on("updateCombat", (combat, changed, options, userId) => {
+  // Only trigger when combat becomes inactive
+  if (changed.active === false) {
+    const soundPath = game.settings.get(MODULE_ID, "combatEndSound");
+    if (soundPath) {
+      AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
+      console.log("Played combat end sound.");
+    }
   }
 });
+
