@@ -152,54 +152,42 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   }
 });
 
-              //    Target Selector     //
-// cyberpunker-red/scripts/autoSelectTarget.js
-Hooks.on("preCreateChatMessage", async (chatMessage, options, userId) => {
-  // Only proceed if the message has a roll
-  if (!chatMessage.data.flags?.core?.roll) return;
+              //    Disable the click-drag     //
 
-  const user = game.users.get(userId);
-  if (!user) return;
+// --- Settings for disabling token movement in combat ---
+const DISABLE_MOVEMENT_KEY = "disableTokenMoveInCombat";
 
-  // Only respond to player rolls
-  if (user.isGM) return;
-
-  // Retrieve the targets from the roll (tokenTargeting)
-  const targets = Array.from(game.user.targets);
-  if (!targets.length) return;
-
-  // Only act if there's exactly one target (you can adjust for multiple targets if needed)
-  if (targets.length === 1) {
-    const targetToken = targets[0];
-
-    // Make GM select this token
-    const gmUsers = game.users.filter(u => u.isGM);
-    gmUsers.forEach(gm => {
-      const gmSocket = game.socket;
-      // Sending a request to the GM to select the target token
-      gmSocket.emit("module.cyberpunker-red.selectTarget", { tokenId: targetToken.id, sceneId: targetToken.scene.id });
-    });
-  }
-});
-
-// Listen for the custom socket event to select the token
-Hooks.once("ready", () => {
-  game.socket.on("module.cyberpunker-red.selectTarget", ({ tokenId, sceneId }) => {
-    const gmUser = game.user;
-    if (!gmUser.isGM) return;
-
-    const scene = game.scenes.get(sceneId);
-    if (!scene) return;
-
-    const token = scene.tokens.get(tokenId);
-    if (!token) return;
-
-    // Select the token for the GM
-    canvas.tokens.releaseAll();
-    token.control({ releaseOthers: true });
+Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, DISABLE_MOVEMENT_KEY, {
+    name: "Disable Token Movement During Combat",
+    hint: "Prevents tokens from being clicked or dragged while a combat encounter is active.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: false
   });
 });
 
+// --- Helper ---
+function isMovementDisabled() {
+  return game.settings.get(MODULE_ID, DISABLE_MOVEMENT_KEY) && game.combat?.active;
+}
+
+// --- Hooks to block token control and drag ---
+Hooks.on("preUpdateToken", (tokenDoc, update, options, userId) => {
+  if (!game.user.isGM && isMovementDisabled()) {
+    // Block any change in position (x or y)
+    if ("x" in update || "y" in update) return false;
+  }
+});
+
+Hooks.on("controlToken", (token, controlled) => {
+  if (!game.user.isGM && isMovementDisabled() && controlled) {
+    // Immediately release control
+    token.release();
+    ui.notifications.warn("Token movement is disabled during combat.");
+  }
+});
 
 
   
