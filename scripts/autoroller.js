@@ -33,3 +33,58 @@ Hooks.on("combatStart", async (combat) => {
   
 });
 
+// ----------------------
+// Combat Start Enhancements
+// ----------------------
+Hooks.once("init", () => {
+  // Setting to hide initiative rolls
+  game.settings.register(MODULE_ID, "hideInitiativeChat", {
+    name: "Hide Initiative Rolls in Chat",
+    hint: "Prevent initiative rolls from being displayed in the chat log.",
+    scope: "world",
+    config: true,
+    default: true,
+    type: Boolean
+  });
+
+  // Setting for custom combat start message
+  game.settings.register(MODULE_ID, "combatStartMessage", {
+    name: "Combat Start Message",
+    hint: "Custom message to display when combat starts.",
+    scope: "world",
+    config: true,
+    default: "Combat has begun!",
+    type: String
+  });
+
+  // Setting for custom combat start sound
+  game.settings.register(MODULE_ID, "combatStartSound", {
+    name: "Combat Start Sound",
+    hint: "Path to the sound file to play when combat starts.",
+    scope: "world",
+    config: true,
+    default: "",
+    type: String
+  });
+});
+
+// Hide initiative rolls and show custom message/play sound
+Hooks.on("preCreateChatMessage", (message, options, userId) => {
+  if (game.settings.get(MODULE_ID, "hideInitiativeChat") && message.data?.flags?.core?.roll?.type === "initiative") {
+    return false; // Prevent the message from posting
+  }
+});
+
+Hooks.on("combatStart", async (combat) => {
+  // Show custom message
+  const msg = game.settings.get(MODULE_ID, "combatStartMessage");
+  if (msg) {
+    ChatMessage.create({ content: `<b>${msg}</b>` });
+  }
+
+  // Play custom sound
+  const soundPath = game.settings.get(MODULE_ID, "combatStartSound");
+  if (soundPath) {
+    AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
+  }
+});
