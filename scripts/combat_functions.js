@@ -172,28 +172,68 @@ function isMovementDisabled() {
   return game.settings.get(MODULE_ID, DISABLE_MOVEMENT_KEY) && game.combat?.active;
 }
 
-// --- Block token drag & click ---
-Hooks.on("renderTokenHUD", (hud, html, token) => {
-  if (!game.user.isGM && isMovementDisabled()) {
-    // Remove the control handle
-    html.css("pointer-events", "none");
-  }
+// --- Patch Token prototype to block drag ---
+Hooks.once("ready", () => {
+  const originalDragStart = Token.prototype._onDragLeftStart;
+  const originalDragMove = Token.prototype._onDragLeftMove;
+
+  Token.prototype._onDragLeftStart = function(event) {
+    if (!game.user.isGM && isMovementDisabled()) {
+      ui.notifications.warn("Token movement is disabled during combat.");
+      return; // Prevent drag from starting
+    }
+    return originalDragStart.call(this, event);
+  };
+
+  Token.prototype._onDragLeftMove = function(event) {
+    if (!game.user.isGM && isMovementDisabled()) return; // Prevent movement while dragging
+    return originalDragMove.call(this, event);
+  };
 });
 
-Hooks.on("controlToken", (token, controlled) => {
-  if (!game.user.isGM && isMovementDisabled() && controlled) {
-    // Immediately release control
-    token.release();
-    ui.notifications.warn("Token movement is disabled during combat.");
-  }
+
+              //    Disable move when not your turn     //
+// --- Settings for turn-based movement restriction ---
+const DISABLE_NOT_YOUR_TURN_KEY = "disableTokenMoveOutsideTurn";
+
+Hooks.once("init", () => {
+  game.settings.register(MODULE_ID, DISABLE_NOT_YOUR_TURN_KEY, {
+    name: "Disable Token Movement Outside Your Turn",
+    hint: "Prevents players from moving their tokens if it is not their turn during combat.",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true
+  });
 });
 
-Hooks.on("preUpdateToken", (tokenDoc, update, options, userId) => {
-  if (!game.user.isGM && isMovementDisabled()) {
-    if ("x" in update || "y" in update) return false;
-  }
-});
+// --- Helper ---
+function isMovementBlockedByTurn(token) {
+  if (!game.settings.get(MODULE_ID, DISABLE_NOT_YOUR_TURN_KEY)) return false;
+  if (!game.combat?.active) return false;
+  if (game.user.isGM) return false; // GM can always move
+  const combatant = token?.combatant;
+  return combatant?.id !== game.combat?.combatant?.id;
+}
 
+// --- Patch Token drag to respect turn ---
+Hooks.once("ready", () => {
+  const originalDragStart = Token.prototype._onDragLeftStart;
+  const originalDragMove = Token.prototype._onDragLeftMove;
+
+  Token.prototype._onDragLeftStart = function(event) {
+    if (isMovementBlockedByTurn(this)) {
+      ui.notifications.warn("You can only move this token on your turn.");
+      return; // Prevent drag from starting
+    }
+    return originalDragStart.call(this, event);
+  };
+
+  Token.prototype._onDragLeftMove = function(event) {
+    if (isMovementBlockedByTurn(this)) return; // Prevent movement while dragging
+    return originalDragMove.call(this, event);
+  };
+});
 
 
 
