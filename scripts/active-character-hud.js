@@ -273,7 +273,7 @@ Hooks.once("ready", async () => {
 });
 
 
-// --- Addendum: Reflex Icon ---
+// --- Addendum: Reflex Icon (click to roll Evasion) ---
 Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   const actor = CyberpunkerRedHUD._getActiveActor();
   if (!actor) return;
@@ -292,13 +292,15 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     const offset = moveContainer.offset(); // { top, left }
     const width = moveContainer.outerWidth();
 
-    // Place reflex icon to the right of move boxes
+    // Create an absolute positioned icon placed to the right of the move boxes
     const reflexIcon = $(`
       <div id="cpr-reflex-icon"
+        role="button"
+        title="Roll Evasion"
         style="
           position: absolute;
-          top: ${offset.top - 30}px;
-          left: ${offset.left + width + 8}px;
+          top: ${offset.top - 25}px;
+          left: ${offset.left + width + 3}px;
           width: 30px;
           height: 30px;
           background: url('icons/svg/lightning.svg') center/contain no-repeat;
@@ -309,18 +311,28 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
       </div>
     `);
 
-    // Append and bind click to roll Evasion
+    // Append to body so it is independent of HUD layout
     $("body").append(reflexIcon);
 
-    reflexIcon.on("click", async () => {
-      // Try to roll Evasion skill directly
-      const skill = foundry.utils.getProperty(actor, "system.skills.evasion");
-      if (skill?.roll) {
-        skill.roll({ event: new Event("click") });
+    // Bind click -> roll Evasion using your provided macro
+    reflexIcon.on("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      // Use the macro you shared. Adjust skipPrompt if you want true/false by default.
+      const skipPrompt = false;
+      if (game.cpr?.macro?.rollItemMacro && typeof game.cpr.macro.rollItemMacro === "function") {
+        try {
+          game.cpr.macro.rollItemMacro("Evasion", { skipPrompt });
+        } catch (err) {
+          console.error("Error calling rollItemMacro('Evasion'):", err);
+          ui.notifications?.error("Failed to roll Evasion (see console).");
+        }
       } else {
-        ui.notifications.warn("Evasion skill not found on this actor.");
+        ui.notifications?.warn("Evasion macro function not found (game.cpr.macro.rollItemMacro).");
       }
     });
   }
 });
+
 
