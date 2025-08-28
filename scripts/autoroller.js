@@ -37,15 +37,6 @@ Hooks.on("combatStart", async (combat) => {
 // Combat Start Enhancements
 // ----------------------
 Hooks.once("init", () => {
-  // Setting to hide initiative rolls
-  game.settings.register(MODULE_ID, "hideInitiativeChat", {
-    name: "Hide Initiative Rolls in Chat",
-    hint: "Prevent initiative rolls from being displayed in the chat log.",
-    scope: "world",
-    config: true,
-    default: true,
-    type: Boolean
-  });
 
   // Setting for custom combat start message
   game.settings.register(MODULE_ID, "combatStartMessage", {
@@ -57,24 +48,19 @@ Hooks.once("init", () => {
     type: String
   });
 
-  // Setting for custom combat start sound
+  // Setting for custom combat start sound (with file picker)
   game.settings.register(MODULE_ID, "combatStartSound", {
     name: "Combat Start Sound",
-    hint: "Path to the sound file to play when combat starts.",
+    hint: "Select a sound file to play when combat starts.",
     scope: "world",
     config: true,
     default: "",
-    type: String
+    type: String,
+    filePicker: "audio"
   });
 });
 
-// Hide initiative rolls and show custom message/play sound
-Hooks.on("preCreateChatMessage", (message, options, userId) => {
-  if (game.settings.get(MODULE_ID, "hideInitiativeChat") && message.data?.flags?.core?.roll?.type === "initiative") {
-    return false; // Prevent the message from posting
-  }
-});
-
+// Show custom message and play sound on combat start
 Hooks.on("combatStart", async (combat) => {
   // Show custom message
   const msg = game.settings.get(MODULE_ID, "combatStartMessage");
@@ -86,5 +72,23 @@ Hooks.on("combatStart", async (combat) => {
   const soundPath = game.settings.get(MODULE_ID, "combatStartSound");
   if (soundPath) {
     AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
+  }
+});
+
+
+
+// ----------------------
+// Initiative Starter Mode
+// ----------------------
+// ----------------------
+// Auto-switch GM UI to Combat Tab
+// ----------------------
+Hooks.on("createCombat", (combat, options, userId) => {
+  // Only switch UI for the GM who created/started the combat
+  if (!game.user.isGM) return;
+
+  if (ui.sidebar?.tabs?.active !== "combat") {
+    ui.sidebar.activateTab("combat");
+    console.log("Switched GM UI to Combat tab.");
   }
 });
