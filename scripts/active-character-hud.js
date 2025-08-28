@@ -343,3 +343,35 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     }
   });
 });
+
+
+// --- Addendum: Auto-select & pan to Active Character on move keys ---
+Hooks.on("canvasReady", () => {
+  if (game.user.isGM) return; // GM unaffected
+
+  window.addEventListener("keydown", (ev) => {
+    const moveKeys = ["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+    if (!moveKeys.includes(ev.code)) return;
+
+    // Block if chat input or a sheet is active
+    if (document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.tagName === "INPUT" ||
+        ui.windows && Object.values(ui.windows).some(w => w.rendered && w.element.is(":visible"))) {
+      return;
+    }
+
+    const activeChar = game.user.character;
+    if (!activeChar) return;
+
+    const activeToken = canvas.tokens?.placeables.find(t => t.actor?.id === activeChar.id);
+    if (!activeToken) return;
+
+    // Auto-select the token if not already
+    if (!activeToken.controlled) {
+      activeToken.control();
+    }
+
+    // Smooth pan to token
+    canvas.animatePan({ x: activeToken.x, y: activeToken.y, scale: canvas.stage.scale.x });
+  });
+});
