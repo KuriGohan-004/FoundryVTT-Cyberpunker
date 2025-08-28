@@ -1,7 +1,11 @@
 const MODULE_ID = "cyberpunker-red";
 
-// Register a world-level setting to toggle auto-roll initiative
+// ----------------------
+// Settings Registration
+// ----------------------
 Hooks.once("init", () => {
+
+  // Auto-roll initiative setting
   game.settings.register(MODULE_ID, "autoRollInitiative", {
     name: "Auto-Roll Initiative",
     hint: "Automatically roll initiative for all tokens without initiative when combat starts.",
@@ -10,35 +14,8 @@ Hooks.once("init", () => {
     default: true,
     type: Boolean
   });
-});
 
-// Auto-roll initiative on combat start if enabled
-Hooks.on("combatStart", async (combat) => {
-  if (!game.settings.get(MODULE_ID, "autoRollInitiative")) return;
-
-  const unrolled = combat.combatants.filter(c => c.initiative === null);
-  if (!unrolled.length) return;
-
-  await combat.rollInitiative(unrolled.map(c => c.id));
-  console.log(`Rolled initiative for ${unrolled.length} combatants.`);
-
-  // Start the next combat round
-  await combat.nextRound();
-  console.log("Advanced to next combat round.");
-
-  // Switch GM UI to chat tab
-  if (ui.sidebar?.tabs?.active !== "chat") {
-    ui.sidebar.activateTab("chat");
-  }
-  
-});
-
-// ----------------------
-// Combat Start Enhancements
-// ----------------------
-Hooks.once("init", () => {
-
-  // Setting for custom combat start message
+  // Combat start message
   game.settings.register(MODULE_ID, "combatStartMessage", {
     name: "Combat Start Message",
     hint: "Custom message to display when combat starts.",
@@ -48,7 +25,7 @@ Hooks.once("init", () => {
     type: String
   });
 
-  // Setting for custom combat start sound (with file picker)
+  // Combat start sound
   game.settings.register(MODULE_ID, "combatStartSound", {
     name: "Combat Start Sound",
     hint: "Select a sound file to play when combat starts.",
@@ -58,66 +35,99 @@ Hooks.once("init", () => {
     type: String,
     filePicker: "audio"
   });
+
+  // Combat start playlist
+  game.settings.register(MODULE_ID, "combatStartPlaylist", {
+    name: "Combat Start Playlist",
+    hint: "Select a playlist to play when combat starts.",
+    scope: "world",
+    config: true,
+    default: "",
+    type: String,
+    choices: () => {
+      // Return an object mapping playlist IDs to their names
+      const playlists = game.playlists.contents;
+      const options = {};
+      playlists.forEach(p => options[p.id] = p.name);
+      return options;
+    }
+  });
+
 });
 
-// Show custom message and play sound on combat start
+// ----------------------
+// Combat Start Handling
+// ----------------------
 Hooks.on("combatStart", async (combat) => {
+
   // Show custom message
   const msg = game.settings.get(MODULE_ID, "combatStartMessage");
-  if (msg) {
-    ChatMessage.create({ content: `<b>${msg}</b>` });
+  if (msg) ChatMessage.create({ content: `<b>${msg}</b>` });
+
+  // Play combat start sound (once)
+  if (!combat.getFlag(MODULE_ID, "soundPlayed")) {
+    const soundPath = game.settings.get(MODULE_ID, "combatStartSound");
+    if (soundPath && game.user.isGM) {
+      game.socket.emit(`module.${MODULE_ID}`, { action: "playSound", src: soundPath });
+    }
+    await combat.setFlag(MODULE_ID, "soundPlayed", true);
   }
 
-  // Play custom sound
-  const soundPath = game.settings.get(MODULE_ID, "combatStartSound");
-  if (soundPath) {
-    AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
+  // Play combat start playlist
+  if (!combat.getFlag(MODULE_ID, "playlistPlayed")) {
+    const playlistId = game.settings.get(MODULE_ID, "combatStartPlaylist");
+    if (playlistId && game.user.isGM) {
+      const playlist = game.playlists.get(playlistId);
+      if (playlist) {
+        await playlist.playAll();
+        game.socket.emit(`module.${MODULE_ID}`, { action: "playPlaylist", playlistId: playlistId });
+      }
+    }
+    await combat.setFlag(MODULE_ID, "playlistPlayed", true);
+  }
+
+});
+
+// ----------------------
+// Socket Listeners
+// ----------------------
+game.socket.on(`module.${MODULE_ID}`, async (data) => {
+  if (data.action === "playSound" && data.src) {
+    AudioHelper.play({ src: data.src, volume: 0.8, autoplay: true, loop: false }, true);
+  }
+  if (data.action === "playPlaylist" && data.playlistId) {
+    const playlist = game.playlists.get(data.playlistId);
+    if (playlist) playlist.playAll();
   }
 });
 
-
-
 // ----------------------
-// Initiative Starter Mode
+// Auto-roll Initiative
 // ----------------------
+Hooks.on("combatStart", async (combat) => {
+  if (!game.settings.get(MODULE_ID, "autoRollInitiative")) return;
+
+  const unrolled = combat.combatants.filter(c => c.initiative === null);
+  if (!unrolled.length) return;
+
+  await combat.rollInitiative(unrolled.map(c => c.id));
+  console.log(`Rolled initiative for ${unrolled.length} combatants.`);
+
+  await combat.nextRound();
+  console.log("Advanced to next combat round.");
+
+  if (ui.sidebar?.tabs?.active !== "chat") {
+    ui.sidebar.activateTab("chat");
+  }
+});
+
 // ----------------------
 // Auto-switch GM UI to Combat Tab
 // ----------------------
 Hooks.on("createCombat", (combat, options, userId) => {
-  // Only switch UI for the GM who created/started the combat
   if (!game.user.isGM) return;
-
   if (ui.sidebar?.tabs?.active !== "combat") {
     ui.sidebar.activateTab("combat");
     console.log("Switched GM UI to Combat tab.");
   }
 });
-
-// ----------------------
-// Combat End Sound
-// ----------------------
-Hooks.once("init", () => {
-  // Setting for custom combat end sound
-  game.settings.register(MODULE_ID, "combatEndSound", {
-    name: "Combat End Sound",
-    hint: "Select a sound file to play when combat ends.",
-    scope: "world",
-    config: true,
-    default: "",
-    type: String,
-    filePicker: "audio"
-  });
-});
-
-// Detect combat ending and play sound
-Hooks.on("updateCombat", (combat, changed, options, userId) => {
-  // Only trigger when combat becomes inactive
-  if (changed.active === false) {
-    const soundPath = game.settings.get(MODULE_ID, "combatEndSound");
-    if (soundPath) {
-      AudioHelper.play({ src: soundPath, volume: 0.8, autoplay: true, loop: false }, true);
-      console.log("Played combat end sound.");
-    }
-  }
-});
-
