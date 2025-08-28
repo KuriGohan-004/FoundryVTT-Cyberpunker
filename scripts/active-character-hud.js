@@ -160,6 +160,9 @@ class CyberpunkerRedHUD {
     statHud.append(container);
     statHud.append(moveContainer);
     this.hudElement.append(statHud);
+
+    // 🔔 Fire custom hook so add-ons can extend HUD (like Reflex icon)
+    Hooks.callAll("renderCyberpunkerRedHUD", this.hudElement);
   }
 
   static setActiveCharacter(actor) {
