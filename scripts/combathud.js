@@ -1,117 +1,91 @@
-// cyberpunker-red-topbar.js
+// cyberpunker-red-tile-links.js
 
 Hooks.once('init', () => {
-  console.log("Cyberpunker Red Top Bar | Initializing");
+  console.log("Cyberpunker Red Tile Links | Initializing");
 
-  // Module setting to toggle the top bar
-  game.settings.register('cyberpunker-red', 'enableTopBar', {
-    name: "Enable Player Token Top Bar",
-    hint: "If disabled, the top bar showing player tokens will not appear.",
-    scope: 'world',
-    config: true,
-    type: Boolean,
-    default: true
+  // Register a module setting if you want global defaults (optional)
+});
+
+Hooks.on('renderTileConfig', (app: TileConfig, html: JQuery, data: any) => {
+  // Add a new section below existing controls
+  const container = $('<div class="form-group"><h4>Cyberpunker Red Scene Link</h4></div>');
+  
+  // Enable checkbox
+  const enableCheckbox = $(`
+    <label>
+      <input type="checkbox" name="data.flags.cyberpunkerRed.enable" ${data.flags?.cyberpunkerRed?.enable ? "checked" : ""}>
+      Enable Scene Link
+    </label>
+  `);
+  container.append(enableCheckbox);
+
+  // Allow Players checkbox
+  const allowPlayersCheckbox = $(`
+    <label>
+      <input type="checkbox" name="data.flags.cyberpunkerRed.allowPlayers" ${data.flags?.cyberpunkerRed?.allowPlayers ? "checked" : ""}>
+      Allow Players
+    </label>
+  `);
+  container.append(allowPlayersCheckbox);
+
+  // Set Active checkbox
+  const setActiveCheckbox = $(`
+    <label>
+      <input type="checkbox" name="data.flags.cyberpunkerRed.setActive" ${data.flags?.cyberpunkerRed?.setActive ? "checked" : ""}>
+      Set Scene Active
+    </label>
+  `);
+  container.append(setActiveCheckbox);
+
+  // Scene selector dropdown
+  const sceneOptions = game.scenes.map(s => `<option value="${s.id}" ${data.flags?.cyberpunkerRed?.scene === s.id ? "selected" : ""}>${s.name}</option>`).join("");
+  const sceneSelector = $(`
+    <label>
+      Scene:
+      <select name="data.flags.cyberpunkerRed.scene">
+        ${sceneOptions}
+      </select>
+    </label>
+  `);
+  container.append(sceneSelector);
+
+  // Insert the container after the existing tile configuration fields
+  html.find('.form-group').last().after(container);
+});
+
+// Hook to handle tile clicks
+Hooks.on('controlToken', (token: Token, controlled: boolean) => {
+  // Only when GM or allowed players control the token
+  if (!controlled) return;
+
+  // Add click listener to tiles with our flag enabled
+  canvas.tiles.placeables.forEach(tile => {
+    const flags = tile.getFlag('cyberpunker-red', 'enable');
+    if (!flags) return;
+
+    const allowPlayers = tile.getFlag('cyberpunker-red', 'allowPlayers') ?? false;
+    if (!game.user.isGM && !allowPlayers) return;
+
+    const targetSceneId = tile.getFlag('cyberpunker-red', 'scene');
+    if (!targetSceneId) return;
+
+    const setActive = tile.getFlag('cyberpunker-red', 'setActive') ?? false;
+
+    // Remove previous listener to avoid duplicates
+    $(tile.object.element).off('click.cyberpunkerRed');
+
+    // Add click listener
+    $(tile.object.element).on('click.cyberpunkerRed', async (event) => {
+      event.stopPropagation();
+
+      const targetScene = game.scenes.get(targetSceneId);
+      if (!targetScene) return ui.notifications.warn("Target scene not found");
+
+      if (setActive) {
+        await targetScene.activate();
+      } else {
+        await targetScene.view();
+      }
+    });
   });
 });
-
-class TopBar {
-  container: HTMLElement;
-
-  constructor() {
-    this.container = document.createElement("div");
-    this.container.id = "cyberpunker-red-topbar";
-    this.container.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 4px;
-      padding: 4px;
-      z-index: 1000;
-      background: rgba(0,0,0,0.5);
-      border-radius: 4px;
-    `;
-    document.body.appendChild(this.container);
-  }
-
-  clear() {
-    this.container.innerHTML = "";
-  }
-
-  addToken(token: TokenDocument) {
-    const square = document.createElement("div");
-    square.style.cssText = `
-      width: 36px;
-      height: 36px;
-      background-image: url(${token.data.img});
-      background-size: cover;
-      cursor: pointer;
-      border: 2px solid white;
-      border-radius: 4px;
-    `;
-    square.onclick = async () => {
-      // Pan to token
-      canvas.animatePan({
-        x: token.x + token.width / 2 - canvas.app.renderer.width / 2,
-        y: token.y + token.height / 2 - canvas.app.renderer.height / 2
-      });
-      // Select token if owned
-      if (token.isOwner) await token.control({ releaseOthers: true });
-    };
-    this.container.appendChild(square);
-  }
-
-  render(tokens: TokenDocument[], encounterActive: boolean) {
-    if (!game.settings.get('cyberpunker-red', 'enableTopBar')) {
-      this.container.style.display = "none";
-      return;
-    }
-
-    if (encounterActive) {
-      this.container.style.display = "none";
-      return;
-    }
-
-    this.container.style.display = "flex";
-    this.clear();
-    tokens.forEach(token => this.addToken(token));
-  }
-}
-
-let topBar: TopBar;
-
-async function updateEncounter() {
-  if (!canvas.scene) return;
-
-  // Find an encounter that hasn't started yet
-  let encounter = game.combats.contents.find(c => !c.started);
-  if (!encounter) {
-    encounter = await Combat.create({ name: "Player Encounter", scene: canvas.scene.id });
-  }
-
-  // Add all player-owned tokens (including offline)
-  const playerTokens = canvas.tokens.placeables.filter(t => t.actor?.hasPlayerOwner);
-  for (let token of playerTokens) {
-    const existing = encounter.combatants.find(c => c.actor?.id === token.actor?.id);
-    if (existing) await encounter.deleteEmbeddedDocuments("Combatant", [existing.id]);
-
-    await encounter.createEmbeddedDocuments("Combatant", [{ tokenId: token.id, actorId: token.actor?.id }]);
-  }
-
-  // Render top bar only if encounter hasn't started
-  topBar?.render(playerTokens, encounter.started);
-}
-
-// Initialize top bar
-Hooks.once('ready', () => {
-  topBar = new TopBar();
-  updateEncounter();
-});
-
-// Update on scene activation, token changes, and combat deletion
-Hooks.on('canvasReady', () => updateEncounter());
-Hooks.on('createToken', () => updateEncounter());
-Hooks.on('deleteToken', () => updateEncounter());
-Hooks.on('updateScene', () => updateEncounter());
-Hooks.on('deleteCombat', () => updateEncounter());
