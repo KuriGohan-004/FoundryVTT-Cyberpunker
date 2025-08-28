@@ -2,7 +2,7 @@
 class CyberpunkerRedHUD {
   static activeCharacterId = null;
   static hudElement = null;
-  static moveUsed = 0; // <--- track how many move squares have been used this turn
+  static moveUsed = 0;
 
   // ---------- Utilities ----------
   static _getActiveActor() {
@@ -84,7 +84,6 @@ class CyberpunkerRedHUD {
   static _buildHUD() {
     this.hudElement?.remove();
 
-    // CLICK-THROUGH: make the whole HUD ignore clicks by default.
     this.hudElement = $(
       `<div id="cyberpunker-red-hud" style="position: absolute; bottom: 15px; right: 320px; display: flex; align-items: flex-end; gap: 10px; pointer-events: none;"></div>`
     ).appendTo(document.body);
@@ -95,8 +94,6 @@ class CyberpunkerRedHUD {
     const token = this._getActiveToken();
     const imgSrc = token?.data?.img || actor.img;
 
-    // Portrait above macro bar and sheets, lowered by 5px
-    // CLICK-THROUGH EXCEPTION: portrait remains interactive.
     const portrait = $(
       `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px; pointer-events: auto;">
         <img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer; pointer-events: auto;"/>
@@ -119,7 +116,6 @@ class CyberpunkerRedHUD {
     const { current, max } = this._resolveHP(sourceActor);
     const pct = this._pct(current, max);
 
-    // HP Bar below everything else, click-through, raised 10px
     const hpBar = $(
       `<div class="cpr-hp-wrap" style="position: relative; width: 330px; height: 28px; background: #1b1b1b; border: 2px solid #000; border-radius: 6px; overflow: hidden; margin-bottom: 0px; margin-right: 5px; z-index: 20; bottom: 40px; pointer-events: none;">
         <div class="cpr-hp-fill" style="width: ${pct}%; height: 100%; background: linear-gradient(90deg, #ff2a2a 0%, #ff4545 50%, #ff5e5e 100%); transition: width 0.25s ease; pointer-events: none;"></div>
@@ -128,7 +124,6 @@ class CyberpunkerRedHUD {
       </div>`
     );
 
-    // Move squares above HP bar, aligned to right, now click-through
     const moveContainer = $(
       `<div class="cpr-move-container" style="display: flex; gap: 2px; position: absolute; bottom: 70px; right: 200px; pointer-events: none;"></div>`
     );
@@ -138,8 +133,6 @@ class CyberpunkerRedHUD {
         `<div class="cpr-move-square" style="width: 16px; height: 16px; background: #3399ff; border-radius: 2px; pointer-events: none;"></div>`
       );
     }
-    // Re-apply any previously-used move squares so HUD rebuilds (which happen on token updates)
-    // do not visually reset squares that have already been consumed this turn.
     const createdSquares = moveContainer.find('.cpr-move-square');
     for (let i = 0; i < Math.min(this.moveUsed, createdSquares.length); i++) {
       $(createdSquares[i]).css('background', '#0d2a66');
@@ -161,12 +154,17 @@ class CyberpunkerRedHUD {
     statHud.append(moveContainer);
     this.hudElement.append(statHud);
 
-    // 🔔 Fire custom hook so add-ons can extend HUD (like Reflex icon)
     Hooks.callAll("renderCyberpunkerRedHUD", this.hudElement);
   }
 
   static setActiveCharacter(actor) {
     if (!actor) return;
+
+    // 🔒 Restrict: Players/Trusted can only control Owned tokens
+    if (!game.user.isGM) {
+      if (!actor.isOwner) return;
+    }
+
     this.activeCharacterId = actor.id;
     game.settings.set("cyberpunker-red", "lastActive", actor.id);
     this._buildHUD();
@@ -175,7 +173,7 @@ class CyberpunkerRedHUD {
   static async restoreLastActive() {
     const lastId = game.settings.get("cyberpunker-red", "lastActive");
     let actor = game.actors.get(lastId);
-    if (!actor) {
+    if (!actor || (!game.user.isGM && !actor.isOwner)) {
       const tok = canvas.tokens.placeables.find(t => t.actor?.isOwner);
       actor = tok?.actor || game.actors.find(a => a.isOwner);
     }
@@ -194,9 +192,17 @@ class CyberpunkerRedHUD {
     Hooks.on("updateToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
     Hooks.on("deleteToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._resetMoveSquares(); });
     Hooks.on("createToken", (doc) => { if (doc.actorId === this.activeCharacterId) this._buildHUD(); });
+
     Hooks.on("controlToken", (token, controlled) => {
-      if (controlled && token.actor?.isOwner) this.setActiveCharacter(token.actor);
+      if (controlled) {
+        if (game.user.isGM || token.actor?.isOwner) {
+          this.setActiveCharacter(token.actor);
+        }
+      }
     });
+
+    Hooks.on("updateScene", () => this._buildHUD()); // 🔄 refresh on scene update
+    Hooks.on("canvasReady", () => this._buildHUD()); // 🔄 rebuild HUD on canvas ready
 
     Hooks.on("updateCombat", (combat, data, options, userId) => {
       if (data.turn !== undefined || data.round !== undefined) {
@@ -206,7 +212,6 @@ class CyberpunkerRedHUD {
     Hooks.on("deleteCombat", () => this._resetMoveSquares());
     Hooks.on("canvasReady", () => this._resetMoveSquares());
 
-    // Track token movement during the active combatant's turn and darken move squares sequentially
     Hooks.on("updateToken", (tokenDoc, updates) => {
       const token = canvas.tokens.get(tokenDoc.id);
       if (!token || !token.actor || token.actor.id !== this.activeCharacterId) return;
@@ -217,7 +222,6 @@ class CyberpunkerRedHUD {
       if (updates.x != null || updates.y != null) {
         const squares = this.hudElement?.find('.cpr-move-square');
         if (!squares || squares.length === 0) return;
-        // Darken the next available square (one per move) until exhausted
         if (this.moveUsed < squares.length) {
           const el = squares.get(this.moveUsed);
           if (el) {
@@ -232,7 +236,7 @@ class CyberpunkerRedHUD {
 
   static _resetMoveSquares() {
     this.hudElement?.find(".cpr-move-square").css("background", "#3399ff");
-    this.moveUsed = 0; // reset the counter when moves/reset events occur
+    this.moveUsed = 0;
   }
 }
 
@@ -272,26 +276,21 @@ Hooks.once("ready", async () => {
   });
 });
 
-
-
-// --- Addendum: Reflex Icon (always visible, always clickable) ---
+// --- Addendum: Reflex Icon ---
 Hooks.on("renderCyberpunkerRedHUD", (hud) => {
   const actor = CyberpunkerRedHUD._getActiveActor();
   if (!actor) return;
 
   const reflex = foundry.utils.getProperty(actor, "system.stats.ref.value") ?? 0;
 
-  // Remove any existing reflex icon
   $("#cpr-reflex-icon").remove();
 
-  // Find the move container's screen position
   const moveContainer = hud.find(".cpr-move-container");
   if (!moveContainer.length) return;
 
-  const offset = moveContainer.offset(); // { top, left }
+  const offset = moveContainer.offset();
   const width = moveContainer.outerWidth();
 
-  // Build the icon
   const reflexIcon = $(`
     <div id="cpr-reflex-icon"
       role="button"
@@ -312,10 +311,8 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     </div>
   `);
 
-  // Append to body so it is independent of HUD layout
   $("body").append(reflexIcon);
 
-  // Always bind click -> roll Evasion
   reflexIcon.on("click", (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
@@ -333,7 +330,3 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
     }
   });
 });
-
-
-
-
