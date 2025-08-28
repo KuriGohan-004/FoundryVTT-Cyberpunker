@@ -2,64 +2,63 @@
 
 Hooks.once('init', () => {
   console.log("Cyberpunker Red Tile Links | Initializing");
-
-  // Register a module setting if you want global defaults (optional)
 });
 
+// Extend the TileConfig form
 Hooks.on('renderTileConfig', (app: TileConfig, html: JQuery, data: any) => {
-  // Add a new section below existing controls
-  const container = $('<div class="form-group"><h4>Cyberpunker Red Scene Link</h4></div>');
-  
-  // Enable checkbox
-  const enableCheckbox = $(`
-    <label>
-      <input type="checkbox" name="data.flags.cyberpunkerRed.enable" ${data.flags?.cyberpunkerRed?.enable ? "checked" : ""}>
-      Enable Scene Link
-    </label>
+  // Container for our options
+  const container = $(`
+    <fieldset class="form-group">
+      <legend>Cyberpunker Red Scene Link</legend>
+      <label>
+        <input type="checkbox" name="flags.cyberpunker-red.enable">
+        Enable Scene Link
+      </label>
+      <br>
+      <label>
+        <input type="checkbox" name="flags.cyberpunker-red.allowPlayers">
+        Allow Players
+      </label>
+      <br>
+      <label>
+        <input type="checkbox" name="flags.cyberpunker-red.setActive">
+        Set Scene Active
+      </label>
+      <br>
+      <label>
+        Scene:
+        <select name="flags.cyberpunker-red.scene"></select>
+      </label>
+    </fieldset>
   `);
-  container.append(enableCheckbox);
 
-  // Allow Players checkbox
-  const allowPlayersCheckbox = $(`
-    <label>
-      <input type="checkbox" name="data.flags.cyberpunkerRed.allowPlayers" ${data.flags?.cyberpunkerRed?.allowPlayers ? "checked" : ""}>
-      Allow Players
-    </label>
-  `);
-  container.append(allowPlayersCheckbox);
+  // Fill scene selector
+  const sceneSelect = container.find('select');
+  game.scenes.forEach(scene => {
+    const selected = data.flags?.['cyberpunker-red']?.scene === scene.id ? "selected" : "";
+    sceneSelect.append(`<option value="${scene.id}" ${selected}>${scene.name}</option>`);
+  });
 
-  // Set Active checkbox
-  const setActiveCheckbox = $(`
-    <label>
-      <input type="checkbox" name="data.flags.cyberpunkerRed.setActive" ${data.flags?.cyberpunkerRed?.setActive ? "checked" : ""}>
-      Set Scene Active
-    </label>
-  `);
-  container.append(setActiveCheckbox);
+  // Append to the form
+  html.find('footer').before(container);
 
-  // Scene selector dropdown
-  const sceneOptions = game.scenes.map(s => `<option value="${s.id}" ${data.flags?.cyberpunkerRed?.scene === s.id ? "selected" : ""}>${s.name}</option>`).join("");
-  const sceneSelector = $(`
-    <label>
-      Scene:
-      <select name="data.flags.cyberpunkerRed.scene">
-        ${sceneOptions}
-      </select>
-    </label>
-  `);
-  container.append(sceneSelector);
-
-  // Insert the container after the existing tile configuration fields
-  html.find('.form-group').last().after(container);
+  // Ensure changes save to tile flags
+  container.find('input, select').on('change', function () {
+    const updates: any = {};
+    container.find('input[name], select[name]').each(function () {
+      const input = $(this);
+      const name = input.attr('name')!;
+      const flagPath = name.split('.');
+      const value = input.is(':checkbox') ? input.prop('checked') : input.val();
+      updates[flagPath[2]] = value;
+    });
+    app.object.setFlag('cyberpunker-red', updates);
+  });
 });
 
-// Hook to handle tile clicks
-Hooks.on('controlToken', (token: Token, controlled: boolean) => {
-  // Only when GM or allowed players control the token
-  if (!controlled) return;
-
-  // Add click listener to tiles with our flag enabled
-  canvas.tiles.placeables.forEach(tile => {
+// Handle clicks on tiles
+Hooks.on('ready', () => {
+  const handleTileClick = async (tile: TileDocument) => {
     const flags = tile.getFlag('cyberpunker-red', 'enable');
     if (!flags) return;
 
@@ -71,21 +70,27 @@ Hooks.on('controlToken', (token: Token, controlled: boolean) => {
 
     const setActive = tile.getFlag('cyberpunker-red', 'setActive') ?? false;
 
-    // Remove previous listener to avoid duplicates
-    $(tile.object.element).off('click.cyberpunkerRed');
+    const targetScene = game.scenes.get(targetSceneId);
+    if (!targetScene) return ui.notifications.warn("Target scene not found");
 
-    // Add click listener
-    $(tile.object.element).on('click.cyberpunkerRed', async (event) => {
-      event.stopPropagation();
+    if (setActive) {
+      await targetScene.activate();
+    } else {
+      await targetScene.view();
+    }
+  };
 
-      const targetScene = game.scenes.get(targetSceneId);
-      if (!targetScene) return ui.notifications.warn("Target scene not found");
-
-      if (setActive) {
-        await targetScene.activate();
-      } else {
-        await targetScene.view();
-      }
+  // Attach listeners for all tiles dynamically
+  Hooks.on('canvasReady', () => {
+    canvas.tiles.placeables.forEach(tile => {
+      // Remove old listener to avoid duplicates
+      $(tile.object.element).off('click.cyberpunkerRed');
+      $(tile.object.element).on('click.cyberpunkerRed', async (event) => {
+        if (game.user.isGM || canvas.tokens.controlled.length > 0) {
+          event.stopPropagation();
+          await handleTileClick(tile.document);
+        }
+      });
     });
   });
 });
