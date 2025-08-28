@@ -297,10 +297,10 @@ Hooks.on("renderCyberpunkerRedHUD", (hud) => {
       <div id="cpr-reflex-icon"
         style="
           position: absolute;
-          top: ${offset.top}px;
+          top: ${offset.top + 3}px;
           left: ${offset.left + width + 8}px; /* 8px padding to the right */
-          width: 24px;
-          height: 24px;
+          width: 30px;
+          height: 30px;
           background: url('icons/svg/lightning.svg') center/contain no-repeat;
           z-index: 30;
           pointer-events: none;
