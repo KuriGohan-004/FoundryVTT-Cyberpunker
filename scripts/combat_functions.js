@@ -153,12 +153,23 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
 });
 
 
-  // --- Auto-skip to next round and switch to chat when combat starts ---
-Hooks.on("updateCombat", async (combat, changed, options, userId) => {
-  if (!game.user.isGM) return; // Only GM executes
+// --- Auto-next round + switch to chat when combat starts (carousel trigger) ---
+let _processedCombats = new WeakSet();
 
-  // Check if the combat was just started
-  if (changed.started !== true) return;
+Hooks.on("updateCombat", async (combat, changed, options, userId) => {
+  // Only GM should run this
+  if (!game.user.isGM) return;
+
+  // Make sure combat actually started
+  if (!combat.started) return;
+  // Prevent double processing
+  if (_processedCombats.has(combat)) return;
+  _processedCombats.add(combat);
+
+  // --- Roll initiative for any combatants without it ---
+  for (const c of combat.combatants) {
+    if (c.initiative == null) await c.rollInitiative({ createCombatants: false });
+  }
 
   // --- Advance to the first turn of the next round ---
   if (combat.combatants.size > 0) {
@@ -172,6 +183,7 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
     ui.sidebar.activateTab("chat");
   }
 });
+
 
 
 
