@@ -152,16 +152,13 @@ Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   }
 });
 
-// --- Auto-roll initiative, skip to next round, and switch to chat on combat start ---
-Hooks.on("createCombat", async (combat) => {
+
+  // --- Auto-skip to next round and switch to chat when combat starts ---
+Hooks.on("updateCombat", async (combat, changed, options, userId) => {
   if (!game.user.isGM) return; // Only GM executes
 
-  // --- Roll initiative for all combatants without one ---
-  for (const c of combat.combatants) {
-    if (c.initiative == null) {
-      await c.rollInitiative({ createCombatants: false });
-    }
-  }
+  // Check if the combat was just started
+  if (changed.started !== true) return;
 
   // --- Advance to the first turn of the next round ---
   if (combat.combatants.size > 0) {
@@ -175,6 +172,7 @@ Hooks.on("createCombat", async (combat) => {
     ui.sidebar.activateTab("chat");
   }
 });
+
 
 
 })();
