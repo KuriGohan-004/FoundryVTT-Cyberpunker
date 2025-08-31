@@ -95,7 +95,7 @@ class CyberpunkerRedHUD {
     const imgSrc = token?.document?.texture?.src || token?.data?.img || actor.img;
 
     const portrait = $(
-      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -5px; pointer-events: auto;">
+      `<div style="position: relative; display: inline-block; z-index: 150; bottom: -15px; pointer-events: auto;">
         <img src="${imgSrc}" style="width: 160px; height: 160px; border-radius: 12px; border: 3px solid #444; cursor: pointer; pointer-events: auto;"/>
       </div>`
     );
